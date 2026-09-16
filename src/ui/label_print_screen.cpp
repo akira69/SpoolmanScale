@@ -4,6 +4,7 @@
 #include <lvgl.h>
 
 #include "services/filaman_api.h"
+#include "services/filaman_print_pending.h"
 #include "services/http_progress.h"
 #include "app/app_state.h"
 #include "lang.h"
@@ -23,9 +24,7 @@ static lv_obj_t* s_status = nullptr;
 static bool s_open_pending = false;
 static bool s_fetch_pending = false;
 static bool s_back_pending = false;
-static bool s_print_pending = false;
-static int s_print_spool_id = 0;
-static int s_print_preset_id = 0;
+static FilaManPrintPending s_print;
 static int s_spool_id = 0;
 static FilaManLabelPreset s_presets[kPresetCapacity];
 static size_t s_count = 0;
@@ -134,10 +133,7 @@ static void showScreen() {
   lv_obj_set_size(pc, 180, 38);
   lv_obj_set_pos(pc, 150, 252);
   lv_obj_add_event_cb(pc, [](lv_event_t*) {
-    if (s_print_pending) return;
-    s_print_spool_id = s_spool_id;
-    s_print_preset_id = prefsGetInt("label_preset", 0);
-    s_print_pending = true;
+    if (!s_print.request(s_spool_id, prefsGetInt("label_preset", 0))) return;
     setStatus(T(STR_LABEL_PC_PENDING));
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* pc_label = lv_label_create(pc);
@@ -155,21 +151,25 @@ void requestLabelPresetScreen(int spool_id) {
 void handleLabelPrintDeferredActions() {
   if (s_back_pending) {
     s_back_pending = false;
+    s_print.cancel();
+    s_fetch_pending = false;
+    s_open_pending = false;
     releaseScreen(&s_screen);
     s_list = nullptr;
     s_status = nullptr;
     showMoreInfoScreen();
+    return;
   }
   if (s_open_pending) { s_open_pending = false; showScreen(); }
   if (s_fetch_pending) { s_fetch_pending = false; fetchPresets(); }
-  if (s_print_pending) {
-    s_print_pending = false;
+  int print_spool_id = 0, print_preset_id = 0;
+  if (s_screen && s_print.take(&print_spool_id, &print_preset_id)) {
     int request_id = 0;
     int code = -1;
     if (wifiManagerIsConnected()) {
       HttpStallTime stall;
       code = filamanRequestLabelPrint(backendBaseUrl(), filamanApiKey(),
-                                      s_print_spool_id, s_print_preset_id, &request_id);
+                                      print_spool_id, print_preset_id, &request_id);
     }
     switch (code) {
       case 201: setStatus(T(STR_LABEL_PC_QUEUED)); break;
@@ -183,6 +183,7 @@ void handleLabelPrintDeferredActions() {
 }
 
 void hideLabelPrintOverlays() {
+  s_print.cancel();
   releaseScreen(&s_screen);
   s_list = nullptr;
   s_status = nullptr;
