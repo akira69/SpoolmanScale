@@ -124,23 +124,9 @@ int filamanListLabelPresets(const char* base_url, const char* api_key,
   http.end();
   if (oversized) { free(body); return -2; }
 
-  JsonDocument doc;
-  if (deserializeJson(doc, body, used)) { free(body); return -2; }
+  const int parse_code = filamanParseLabelPresets(body, out, capacity, count);
   free(body);
-  JsonArrayConst presets = doc.as<JsonArrayConst>();
-  if (presets.isNull() || presets.size() > capacity) return -3;
-  for (JsonVariantConst value : presets) {
-    JsonObjectConst preset = value.as<JsonObjectConst>();
-    const int id = preset["id"] | -1;
-    const char* name = preset["name"].as<const char*>();
-    if (preset.isNull() || id <= 0 || !name || !name[0] ||
-        strlen(name) >= sizeof(out[*count].name)) return -3;
-    out[*count].id = id;
-    strncpy(out[*count].name, name, sizeof(out[*count].name) - 1);
-    out[*count].name[sizeof(out[*count].name) - 1] = '\0';
-    ++*count;
-  }
-  return code;
+  return parse_code < 0 ? parse_code : code;
 }
 
 // ------------------------------------------------------------

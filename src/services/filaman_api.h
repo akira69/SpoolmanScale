@@ -5,11 +5,7 @@
 #include <stdint.h>
 
 #include "services/ams_slots.h"
-
-struct FilaManLabelPreset {
-  int id;
-  char name[64];
-};
+#include "services/filaman_label_preset_parse.h"
 
 // GET /api/v1/labels/presets. Returns HTTP status or a negative local error.
 // The list is either complete or rejected; it is never silently truncated.
