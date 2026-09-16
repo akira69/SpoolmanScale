@@ -1,5 +1,5 @@
 #include "filaman_api.h"
-#include "services/filaman_print_request_parse.h"
+#include "services/filaman_api_key.h"
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -89,29 +89,8 @@ static float roundGrams(float g) {
   return roundf(g);
 }
 
-// Defined further down, next to the other request helpers.
-static void addApiKey(HTTPClient& http, const char* api_key);
-
 #define FILAMAN_LABEL_PRESET_MAX  64
 #define FILAMAN_LABEL_PRESET_JSON_MAX  8192
-
-int filamanRequestLabelPrint(const char* base_url, const char* api_key, int spool_id,
-                             int preset_id, int* request_id, uint32_t timeout_ms) {
-  if (request_id) *request_id = 0;
-  if (!request_id || !hasBaseUrl(base_url) || !api_key || !api_key[0] ||
-      spool_id <= 0 || preset_id < 0) return -1;
-  String url = String(base_url) + "/api/v1/labels/spool/" + spool_id + "/print-request";
-  if (preset_id) url += String("?preset_id=") + preset_id;
-  HTTPClient http;
-  http.begin(url);
-  http.setTimeout(timeout_ms);
-  addApiKey(http, api_key);
-  const int code = http.POST("");
-  if (code != 201) { http.end(); return code; }
-  const String body = http.getString();
-  http.end();
-  return filamanParsePrintRequest(body.c_str(), spool_id, preset_id, request_id);
-}
 
 int filamanListLabelPresets(const char* base_url, const char* api_key,
                             FilaManLabelPreset* out, size_t capacity, size_t* count,
@@ -423,14 +402,6 @@ static void mapSpool(JsonObjectConst src, JsonObject dst) {
     vendor["id"]   = fil["manufacturer_id"] | 0;
     vendor["name"] = fil["manufacturer"]["name"] | "";
     vendor["empty_spool_weight"] = fil["manufacturer"]["empty_spool_weight_g"] | 0.0f;
-  }
-}
-
-// Adds the Authorization header for the API key, which FilaMan requires for
-// everything under /api/v1 apart from device endpoints.
-static void addApiKey(HTTPClient& http, const char* api_key) {
-  if (api_key && api_key[0]) {
-    http.addHeader("Authorization", String("ApiKey ") + api_key);
   }
 }
 

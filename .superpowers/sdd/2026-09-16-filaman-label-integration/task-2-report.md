@@ -19,3 +19,16 @@
 
 - Local server at `127.0.0.1:8000` returned 404 to an unauthenticated POST for this endpoint. No user credentials or signed-in PC tab were available. Same-user prompt, different-user isolation, one-request double tap on hardware, PDF export, and unreachable-server UI have not been manually verified.
 - `HTTPClient::POST` is called once. A negative transport result is shown as failure with a prompt to inspect the FilaMan tab before sending again, because the server may have queued a request despite a timeout.
+
+## Review fixes
+
+- Root cause: Back released the screen but execution continued to the pending POST branch; hiding overlays also left the pending flag set. Both paths now cancel the pending request. Back returns after navigation so the same pass cannot send an unseen request.
+- The German API key help now names a user API key, `spools:read`, and a PC tab signed in as the same user.
+- Extracted the existing API key header helper for use by both FilaMan API translation units. A host test runs the real print request function with a fake HTTP transport and checks URL, optional preset query, `Authorization: ApiKey`, one POST on transport failure, and parsed request ID. A separate host check runs the real pending state to verify frozen IDs, duplicate tap rejection, and cancellation.
+
+### Review RED / GREEN
+
+- RED: `python3 test/test_filaman_print_flow.py` failed because `src/services/filaman_print_request.cpp` did not exist.
+- GREEN: `python3 test/test_filaman_print_flow.py`, `python3 test/test_filaman_print_request.py`, and `python3 test/test_filaman_label_presets.py` each exited 0.
+- Firmware: `PLATFORMIO_CORE_DIR=/tmp/filaman-scale-platformio-core PLATFORMIO_SETTING_ENABLE_TELEMETRY=no pio run -e wt32-sc01-plus` exited 0, `[SUCCESS] Took 9.15 seconds`.
+- Deferred UI and physical double tap remain unverified on hardware. The host test covers the shared state behavior, while Back and overlay call sites were reviewed directly.
