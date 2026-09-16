@@ -4,6 +4,8 @@
 #include <lvgl.h>
 
 #include "services/filaman_api.h"
+#include "services/filaman_labels.h"
+#include "services/phomemo_m220.h"
 #include "services/filaman_print_pending.h"
 #include "services/http_progress.h"
 #include "app/app_state.h"
@@ -24,12 +26,27 @@ static lv_obj_t* s_status = nullptr;
 static bool s_open_pending = false;
 static bool s_fetch_pending = false;
 static bool s_back_pending = false;
+static bool s_scan_pending = false;
+static bool s_m220_pending = false;
+static int s_m220_spool = 0, s_m220_preset = 0;
+static uint16_t s_m220_width = 576;
+static char s_m220_address[18] = {};
+static uint16_t s_requested_width = 576;
+static M220Device s_found_devices[8];
+static lv_obj_t* s_width_label = nullptr;
 static FilaManPrintPending s_print;
 static int s_spool_id = 0;
 static FilaManLabelPreset s_presets[kPresetCapacity];
 static size_t s_count = 0;
 
 static void fillList();
+
+static void updateWidth() {
+  if (!s_width_label) return;
+  char text[24];
+  snprintf(text, sizeof(text), "%u px", unsigned(s_m220_width));
+  lv_label_set_text(s_width_label, text);
+}
 
 static void setStatus(const char* text) {
   if (s_status) lv_label_set_text(s_status, text);
@@ -122,16 +139,32 @@ static void showScreen() {
   lv_obj_set_pos(s_status, 25, 48);
 
   s_list = lv_obj_create(s_screen);
-  lv_obj_set_size(s_list, 420, 143);
+  lv_obj_set_size(s_list, 420, 104);
   lv_obj_set_pos(s_list, 30, 104);
   lv_obj_set_flex_flow(s_list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_all(s_list, 8, 0);
   lv_obj_set_style_pad_row(s_list, 6, 0);
   lv_obj_set_style_bg_color(s_list, lv_color_hex(0x09111e), 0);
   fillList();
+  int saved_width = prefsGetInt("m220_width", 576);
+  s_m220_width = saved_width >= 384 && saved_width <= 1024 && saved_width % 8 == 0 ? saved_width : 576;
+
+  lv_obj_t* minus = lv_btn_create(s_screen);
+  lv_obj_set_size(minus, 42, 34); lv_obj_set_pos(minus, 30, 213);
+  lv_obj_add_event_cb(minus, [](lv_event_t*) { if (s_m220_width > 384) { s_m220_width -= 8; prefsPutInt("m220_width", s_m220_width); updateWidth(); } }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* minus_text = lv_label_create(minus); lv_label_set_text(minus_text, "-"); lv_obj_center(minus_text);
+  s_width_label = lv_label_create(s_screen); lv_obj_set_pos(s_width_label, 82, 221); updateWidth();
+  lv_obj_t* plus = lv_btn_create(s_screen);
+  lv_obj_set_size(plus, 42, 34); lv_obj_set_pos(plus, 155, 213);
+  lv_obj_add_event_cb(plus, [](lv_event_t*) { if (s_m220_width < 1024) { s_m220_width += 8; prefsPutInt("m220_width", s_m220_width); updateWidth(); } }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* plus_text = lv_label_create(plus); lv_label_set_text(plus_text, "+"); lv_obj_center(plus_text);
+  lv_obj_t* scan = lv_btn_create(s_screen);
+  lv_obj_set_size(scan, 140, 34); lv_obj_set_pos(scan, 315, 213);
+  lv_obj_add_event_cb(scan, [](lv_event_t*) { s_scan_pending = true; }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* scan_text = lv_label_create(scan); lv_label_set_text(scan_text, T(STR_LABEL_M220_SCAN)); lv_obj_center(scan_text);
   lv_obj_t* pc = lv_btn_create(s_screen);
   lv_obj_set_size(pc, 180, 38);
-  lv_obj_set_pos(pc, 150, 252);
+  lv_obj_set_pos(pc, 45, 252);
   lv_obj_add_event_cb(pc, [](lv_event_t*) {
     if (!s_print.request(s_spool_id, prefsGetInt("label_preset", 0))) return;
     setStatus(T(STR_LABEL_PC_PENDING));
@@ -139,6 +172,21 @@ static void showScreen() {
   lv_obj_t* pc_label = lv_label_create(pc);
   lv_label_set_text(pc_label, T(STR_LABEL_PC_OPEN));
   lv_obj_center(pc_label);
+  lv_obj_t* printer = lv_btn_create(s_screen);
+  lv_obj_set_size(printer, 180, 38); lv_obj_set_pos(printer, 255, 252);
+  lv_obj_add_event_cb(printer, [](lv_event_t*) {
+    if (s_m220_pending || s_m220_spool) return;
+    String address = prefsGetString("m220_addr");
+    if (address.isEmpty()) { setStatus(T(STR_LABEL_M220_SELECT)); return; }
+    snprintf(s_m220_address, sizeof(s_m220_address), "%s", address.c_str());
+    s_m220_spool = s_spool_id;
+    s_m220_preset = prefsGetInt("label_preset", 0);
+    s_requested_width = s_m220_width;
+    s_m220_pending = true;
+    setStatus(T(STR_LABEL_M220_FETCH));
+  }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* printer_text = lv_label_create(printer);
+  lv_label_set_text(printer_text, T(STR_LABEL_M220_PRINT)); lv_obj_center(printer_text);
   s_fetch_pending = true;
 }
 }  // namespace
@@ -153,15 +201,66 @@ void handleLabelPrintDeferredActions() {
     s_back_pending = false;
     s_print.cancel();
     s_fetch_pending = false;
+    s_scan_pending = s_m220_pending = false;
+    s_m220_spool = 0;
     s_open_pending = false;
     releaseScreen(&s_screen);
     s_list = nullptr;
     s_status = nullptr;
+    s_width_label = nullptr;
     showMoreInfoScreen();
     return;
   }
   if (s_open_pending) { s_open_pending = false; showScreen(); }
   if (s_fetch_pending) { s_fetch_pending = false; fetchPresets(); }
+  if (s_scan_pending && s_screen) {
+    s_scan_pending = false;
+    setStatus(T(STR_LABEL_M220_SCAN));
+    size_t count = phomemoM220Scan(s_found_devices, 8);
+    if (s_list) {
+      lv_obj_clean(s_list);
+      for (size_t i = 0; i < count; ++i) {
+        lv_obj_t* row = lv_btn_create(s_list);
+        lv_obj_set_size(row, 392, 42);
+        lv_obj_t* label = lv_label_create(row);
+        lv_label_set_text_fmt(label, "%s %s", s_found_devices[i].name, s_found_devices[i].address);
+        lv_obj_center(label);
+        lv_obj_add_event_cb(row, [](lv_event_t* event) {
+          const char* address = static_cast<const char*>(lv_event_get_user_data(event));
+          prefsPutString("m220_addr", address);
+          fillList();
+          setStatus(address);
+        }, LV_EVENT_CLICKED, s_found_devices[i].address);
+      }
+    }
+    if (!count) setStatus(T(STR_LABEL_M220_NONE));
+  }
+  if (s_m220_pending && s_screen) {
+    s_m220_pending = false;
+    LabelRaster image{};
+    int code = -1;
+    if (wifiManagerIsConnected()) {
+      HttpStallTime stall;
+      code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
+                                   s_m220_spool, s_m220_preset, s_requested_width, &image);
+    }
+    s_m220_spool = 0;
+    if (code == 200) {
+      setStatus(T(STR_LABEL_M220_SEND));
+      char error[80];
+      bool sent = phomemoM220Print(s_m220_address, image, error, sizeof(error));
+      setStatus(sent ? T(STR_LABEL_M220_SENT) : error);
+    } else {
+      switch (code) {
+        case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
+        case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
+        case 404: s_fetch_pending = true; setStatus(T(STR_LABEL_PC_MISSING)); break;
+        case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
+        default: setStatus(T(STR_LABEL_M220_FAILED)); break;
+      }
+    }
+    filamanFreeLabel(&image);
+  }
   int print_spool_id = 0, print_preset_id = 0;
   if (s_screen && s_print.take(&print_spool_id, &print_preset_id)) {
     int request_id = 0;
@@ -190,4 +289,7 @@ void hideLabelPrintOverlays() {
   s_fetch_pending = false;
   s_open_pending = false;
   s_back_pending = false;
+  s_scan_pending = s_m220_pending = false;
+  s_m220_spool = 0;
+  s_width_label = nullptr;
 }
