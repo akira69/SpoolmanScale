@@ -83,7 +83,11 @@ static void fetchPresets() {
   if (code != 200) {
     s_count = 0;
     fillList();
-    setStatus(code > 0 ? T(STR_LABEL_LOAD_FAIL) : T(STR_LABEL_LOAD_FAIL));
+    switch (code) {
+      case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
+      case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
+      default: setStatus(T(STR_LABEL_LOAD_FAIL)); break;
+    }
     return;
   }
   int selected = prefsGetInt("label_preset", 0);
@@ -258,7 +262,7 @@ void handleLabelPrintDeferredActions() {
         case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
         case 404: fetchPresets(); setStatus(T(STR_LABEL_PC_MISSING)); break;
         case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
-        default: setStatus(T(STR_LABEL_M220_FAILED)); break;
+        default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_M220_FAILED : STR_LABEL_NO_WIFI)); break;
       }
     }
     filamanFreeLabel(&image);
@@ -276,9 +280,9 @@ void handleLabelPrintDeferredActions() {
       case 201: setStatus(T(STR_LABEL_PC_QUEUED)); break;
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
       case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-      case 404: setStatus(T(STR_LABEL_PC_MISSING)); break;
+      case 404: fetchPresets(); setStatus(T(STR_LABEL_PC_MISSING)); break;
       case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
-      default: setStatus(T(STR_LABEL_PC_FAILED)); break;
+      default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_PC_FAILED : STR_LABEL_NO_WIFI)); break;
     }
   }
 }
