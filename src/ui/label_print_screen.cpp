@@ -4,6 +4,7 @@
 #include <lvgl.h>
 
 #include "services/filaman_api.h"
+#include "services/http_progress.h"
 #include "app/app_state.h"
 #include "lang.h"
 #include "services/backend.h"
@@ -22,6 +23,9 @@ static lv_obj_t* s_status = nullptr;
 static bool s_open_pending = false;
 static bool s_fetch_pending = false;
 static bool s_back_pending = false;
+static bool s_print_pending = false;
+static int s_print_spool_id = 0;
+static int s_print_preset_id = 0;
 static int s_spool_id = 0;
 static FilaManLabelPreset s_presets[kPresetCapacity];
 static size_t s_count = 0;
@@ -119,13 +123,26 @@ static void showScreen() {
   lv_obj_set_pos(s_status, 25, 48);
 
   s_list = lv_obj_create(s_screen);
-  lv_obj_set_size(s_list, 420, 220);
-  lv_obj_set_pos(s_list, 30, 78);
+  lv_obj_set_size(s_list, 420, 143);
+  lv_obj_set_pos(s_list, 30, 104);
   lv_obj_set_flex_flow(s_list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_all(s_list, 8, 0);
   lv_obj_set_style_pad_row(s_list, 6, 0);
   lv_obj_set_style_bg_color(s_list, lv_color_hex(0x09111e), 0);
   fillList();
+  lv_obj_t* pc = lv_btn_create(s_screen);
+  lv_obj_set_size(pc, 180, 38);
+  lv_obj_set_pos(pc, 150, 252);
+  lv_obj_add_event_cb(pc, [](lv_event_t*) {
+    if (s_print_pending) return;
+    s_print_spool_id = s_spool_id;
+    s_print_preset_id = prefsGetInt("label_preset", 0);
+    s_print_pending = true;
+    setStatus(T(STR_LABEL_PC_PENDING));
+  }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* pc_label = lv_label_create(pc);
+  lv_label_set_text(pc_label, T(STR_LABEL_PC_OPEN));
+  lv_obj_center(pc_label);
   s_fetch_pending = true;
 }
 }  // namespace
@@ -145,6 +162,24 @@ void handleLabelPrintDeferredActions() {
   }
   if (s_open_pending) { s_open_pending = false; showScreen(); }
   if (s_fetch_pending) { s_fetch_pending = false; fetchPresets(); }
+  if (s_print_pending) {
+    s_print_pending = false;
+    int request_id = 0;
+    int code = -1;
+    if (wifiManagerIsConnected()) {
+      HttpStallTime stall;
+      code = filamanRequestLabelPrint(backendBaseUrl(), filamanApiKey(),
+                                      s_print_spool_id, s_print_preset_id, &request_id);
+    }
+    switch (code) {
+      case 201: setStatus(T(STR_LABEL_PC_QUEUED)); break;
+      case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
+      case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
+      case 404: setStatus(T(STR_LABEL_PC_MISSING)); break;
+      case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
+      default: setStatus(T(STR_LABEL_PC_FAILED)); break;
+    }
+  }
 }
 
 void hideLabelPrintOverlays() {

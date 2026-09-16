@@ -615,6 +615,14 @@ const char* const STRINGS[][2] = {
   { "Kein WLAN", "No WiFi" }, // STR_LABEL_NO_WIFI
   { "Vorlagen konnten nicht geladen werden", "Could not load presets" }, // STR_LABEL_LOAD_FAIL
   { "Gespeicherte Vorlage wurde entfernt; Standard gewählt", "Saved preset was removed; default selected" }, // STR_LABEL_PRESET_REMOVED
+  { "Auf PC öffnen", "Open on PC" }, // STR_LABEL_PC_OPEN
+  { "Anfrage wird gesendet...", "Sending request..." }, // STR_LABEL_PC_PENDING
+  { "Anfrage eingereiht - im FilaMan-Tab bestätigen. Dort Drucken oder PDF exportieren.", "Request queued - approve it in the FilaMan tab. Choose Print or Export PDF there." }, // STR_LABEL_PC_QUEUED
+  { "API-Key prüfen.", "Check the user API key." }, // STR_LABEL_PC_KEY
+  { "Benutzer-API-Key mit spools:read verwenden.", "Use a user API key with spools:read." }, // STR_LABEL_PC_SCOPE
+  { "Spule oder Vorlage aktualisieren und erneut wählen.", "Refresh the spool or preset and select again." }, // STR_LABEL_PC_MISSING
+  { "Spule oder Vorlage prüfen und korrigieren.", "Check and correct the spool or preset." }, // STR_LABEL_PC_INVALID
+  { "Anfrage fehlgeschlagen. Im FilaMan-Tab prüfen, bevor erneut gesendet wird.", "Request failed. Check the FilaMan tab before sending again." }, // STR_LABEL_PC_FAILED
   { "Ortsabfrage bei Entnahme",      "Location on removal"                },  // STR_BTN_AUTO_LOC_POPUP
   { "Trocknungserinnerung",          "Drying Reminder"                    },  // STR_BTN_DRYING_REMINDER
   { "Trocknungserinnerung",          "Drying Reminder"                    },  // STR_DRYING_REMINDER_TITLE
@@ -1295,7 +1303,7 @@ const char* const STRINGS[][2] = {
   { "<b>Welcher Tag für welches Format.</b> OpenSpool braucht rund 180 Byte und damit einen <b>NTAG215</b> (496 Byte) oder <b>NTAG216</b> (872 Byte). Auf einen NTAG213 (144 Byte) passt davon nichts, dort geht nur Anycubic ACE, das mit 112 Byte auskommt. Meldet ein Tag keine Größe, rechnet die Waage sicherheitshalber mit den 144 Byte eines NTAG213 - dann den Tag einmal mit einer NFC-App als NDEF formatieren, das trägt die Größe ein.",
     "<b>Which tag for which format.</b> OpenSpool needs about 180 bytes, so it wants an <b>NTAG215</b> (496 bytes) or an <b>NTAG216</b> (872 bytes). None of it fits an NTAG213 (144 bytes), which leaves Anycubic ACE, and that needs only 112. A tag that reports no size at all is treated as the 144 bytes of an NTAG213 to stay safe - format such a tag as NDEF once with any NFC app and it will report its real size." },  // STR_W_TAG_SIZES
   { "In FilaMan auf den Benutzernamen klicken, dort <b>API keys</b> wählen und einen Schlüssel anlegen. Er wird nur einmal angezeigt, also gleich kopieren. Danach zeigt FilaMan einen sechsstelligen Gerätecode - den unten eintragen und registrieren.",
-    "In FilaMan, click your user name, choose <b>API keys</b> and create a key. It is shown once, so copy it right away. FilaMan then shows a six character device code - enter it below and register." },  // STR_W_FM_SETUP
+    "In FilaMan, create a <b>user API key</b> with <b>spools:read</b>. Keep a PC tab signed in as the same user for label requests. The key is shown once. FilaMan also shows a six character device code - enter it below and register." },  // STR_W_FM_SETUP
   { "Der Schlüssel steht in BamBuddy unter den Einstellungen. Läuft die Instanz ohne Anmeldung, bleibt das Feld leer.",
     "The key is in BamBuddy under settings. Leave the field empty if the instance runs without authentication." },  // STR_W_BB_SETUP
   { "Strom nicht trennen",
