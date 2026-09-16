@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <BLEDevice.h>
+#include <esp_gattc_api.h>
 #include <cstdio>
 #include <cstring>
 
@@ -40,12 +41,17 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     if (!write || (!write->canWrite() && !write->canWriteNoResponse())) {
       fail("M220 write characteristic missing."); break;
     }
-    const size_t chunk = min(size_t(128), size_t(client->getMTU() > 3 ? client->getMTU() - 3 : 20));
+    const size_t chunk = m220WriteChunk(client->getMTU());
     const bool response = write->canWrite();
     auto send = [&](const uint8_t* data, size_t length) {
       for (size_t pos = 0; pos < length; pos += chunk) {
         if (!client->isConnected()) return false;
-        write->writeValue(const_cast<uint8_t*>(data + pos), min(chunk, length - pos), response);
+        esp_err_t result = esp_ble_gattc_write_char(
+            client->getGattcIf(), client->getConnId(), write->getHandle(),
+            min(chunk, length - pos), const_cast<uint8_t*>(data + pos),
+            response ? ESP_GATT_WRITE_TYPE_RSP : ESP_GATT_WRITE_TYPE_NO_RSP,
+            ESP_GATT_AUTH_REQ_NONE);
+        if (result != ESP_OK) return false;
         if (!client->isConnected()) return false;
         delay(20);
       }
