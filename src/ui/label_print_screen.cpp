@@ -201,6 +201,8 @@ void requestLabelPresetScreen(int spool_id) {
   s_open_pending = true;
 }
 
+void requestLabelPresetRefresh() { s_restore_presets_pending = true; }
+
 void handleLabelPrintDeferredActions() {
   if (s_back_pending) {
     s_back_pending = false;

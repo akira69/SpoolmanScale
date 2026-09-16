@@ -111,7 +111,9 @@ int filamanListLabelPresets(const char* base_url, const char* api_key,
   size_t used = 0;
   WiFiClient* stream = http.getStreamPtr();
   while ((http.connected() || stream->available()) && used < FILAMAN_LABEL_PRESET_JSON_MAX) {
-    const size_t room = FILAMAN_LABEL_PRESET_JSON_MAX - used;
+    const size_t room = declared >= 0 ? size_t(declared) - used
+                                      : FILAMAN_LABEL_PRESET_JSON_MAX - used;
+    if (!room) break;
     const size_t got = stream->readBytes(body + used, room);
     if (!got) break;
     used += got;
