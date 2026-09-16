@@ -103,11 +103,11 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
   do {
     if (!client->connect(BLEAddress(address))) {
       // REG/OPEN give their semaphores before BLEDevice calls our hook.
-      // No event means the API failed synchronously and removed the peer.
-      const uint8_t last_event = client->getConnId() != ESP_GATT_IF_NONE
-          ? ESP_GATTC_OPEN_EVT : client->getGattcIf() != ESP_GATT_IF_NONE
-          ? ESP_GATTC_REG_EVT : 0;
-      connect_completed = !last_event || connectEventComplete(last_event);
+      // REG is event 0; even a synchronous registration error is ambiguous
+      // with a failed REG callback, so wait and retain on timeout.
+      const uint8_t expected = client->getConnId() != ESP_GATT_IF_NONE
+          ? ESP_GATTC_OPEN_EVT : ESP_GATTC_REG_EVT;
+      connect_completed = connectEventComplete(expected);
       fail("Could not connect to M220.");
       break;
     }
