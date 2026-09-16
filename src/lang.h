@@ -441,6 +441,17 @@ enum StringID {
   STR_LOCATION_HINT_EMPTY,
   STR_LOCATION_LIMIT_HIT,
 
+  // FilaMan label presets
+  STR_LABEL_PRINT,
+  STR_LABEL_PRESET_TITLE,
+  STR_LABEL_DEFAULT,
+  STR_LABEL_REFRESH,
+  STR_LABEL_LOADING,
+  STR_LABEL_NONE,
+  STR_LABEL_NO_WIFI,
+  STR_LABEL_LOAD_FAIL,
+  STR_LABEL_PRESET_REMOVED,
+
   // No spools hint (link flow)
 
   // Auto location popup toggle

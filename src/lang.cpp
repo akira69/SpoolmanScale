@@ -606,6 +606,15 @@ const char* const STRINGS[][2] = {
     "Empty locations are not shown"                                        },  // STR_LOCATION_HINT_EMPTY
   { "Zu viele Lagerorte - nicht alle angezeigt",
     "Too many locations - not all shown"                                   },  // STR_LOCATION_LIMIT_HIT
+  { "Label drucken", "Print label" }, // STR_LABEL_PRINT
+  { "Label-Vorlage", "Label preset" }, // STR_LABEL_PRESET_TITLE
+  { "Standard-Label", "Default label" }, // STR_LABEL_DEFAULT
+  { "Aktualisieren", "Refresh" }, // STR_LABEL_REFRESH
+  { "Lade Vorlagen...", "Loading presets..." }, // STR_LABEL_LOADING
+  { "Keine Vorlagen gespeichert", "No saved presets" }, // STR_LABEL_NONE
+  { "Kein WLAN", "No WiFi" }, // STR_LABEL_NO_WIFI
+  { "Vorlagen konnten nicht geladen werden", "Could not load presets" }, // STR_LABEL_LOAD_FAIL
+  { "Gespeicherte Vorlage wurde entfernt; Standard gewählt", "Saved preset was removed; default selected" }, // STR_LABEL_PRESET_REMOVED
   { "Ortsabfrage bei Entnahme",      "Location on removal"                },  // STR_BTN_AUTO_LOC_POPUP
   { "Trocknungserinnerung",          "Drying Reminder"                    },  // STR_BTN_DRYING_REMINDER
   { "Trocknungserinnerung",          "Drying Reminder"                    },  // STR_DRYING_REMINDER_TITLE

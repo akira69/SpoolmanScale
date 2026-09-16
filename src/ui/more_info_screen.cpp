@@ -24,6 +24,7 @@
 #include "confirm_popup.h"
 #include "tag_display.h"
 #include "ui/tag_write_popup.h"
+#include "ui/label_print_screen.h"
 #include "ui_common.h"
 
 
@@ -793,6 +794,15 @@ void buildMoreInfoScreen() {
     lv_obj_set_width(chip_val, 134);
     lv_label_set_long_mode(chip_val, LV_LABEL_LONG_DOT);
     lv_obj_align(chip_val, LV_ALIGN_CENTER, 0, 8);
+
+    // The right side of this header has no other control before Close.
+    lv_obj_t *btn_label = lv_btn_create(hdr);
+    lv_obj_set_size(btn_label, 116, 34);
+    lv_obj_set_pos(btn_label, 282, 9);
+    lv_obj_add_event_cb(btn_label, [](lv_event_t*) { requestLabelPresetScreen(sm_id); }, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *label = lv_label_create(btn_label);
+    lv_label_set_text(label, T(STR_LABEL_PRINT));
+    lv_obj_center(label);
   }
 
   // Close X button - Fix 10: 44x44px proper size
