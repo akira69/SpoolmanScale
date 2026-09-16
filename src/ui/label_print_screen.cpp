@@ -27,6 +27,7 @@ static bool s_open_pending = false;
 static bool s_fetch_pending = false;
 static bool s_back_pending = false;
 static bool s_scan_pending = false;
+static bool s_restore_presets_pending = false;
 static bool s_m220_pending = false;
 static int s_m220_spool = 0, s_m220_preset = 0;
 static uint16_t s_m220_width = 576;
@@ -201,7 +202,7 @@ void handleLabelPrintDeferredActions() {
     s_back_pending = false;
     s_print.cancel();
     s_fetch_pending = false;
-    s_scan_pending = s_m220_pending = false;
+    s_scan_pending = s_m220_pending = s_restore_presets_pending = false;
     s_m220_spool = 0;
     s_open_pending = false;
     releaseScreen(&s_screen);
@@ -213,6 +214,7 @@ void handleLabelPrintDeferredActions() {
   }
   if (s_open_pending) { s_open_pending = false; showScreen(); }
   if (s_fetch_pending) { s_fetch_pending = false; fetchPresets(); }
+  if (s_restore_presets_pending) { s_restore_presets_pending = false; fillList(); }
   if (s_scan_pending && s_screen) {
     s_scan_pending = false;
     setStatus(T(STR_LABEL_M220_SCAN));
@@ -228,12 +230,12 @@ void handleLabelPrintDeferredActions() {
         lv_obj_add_event_cb(row, [](lv_event_t* event) {
           const char* address = static_cast<const char*>(lv_event_get_user_data(event));
           prefsPutString("m220_addr", address);
-          fillList();
+          s_restore_presets_pending = true;
           setStatus(address);
         }, LV_EVENT_CLICKED, s_found_devices[i].address);
       }
     }
-    if (!count) setStatus(T(STR_LABEL_M220_NONE));
+    if (!count) { fillList(); setStatus(T(STR_LABEL_M220_NONE)); }
   }
   if (s_m220_pending && s_screen) {
     s_m220_pending = false;
@@ -254,7 +256,7 @@ void handleLabelPrintDeferredActions() {
       switch (code) {
         case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
         case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-        case 404: s_fetch_pending = true; setStatus(T(STR_LABEL_PC_MISSING)); break;
+        case 404: fetchPresets(); setStatus(T(STR_LABEL_PC_MISSING)); break;
         case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
         default: setStatus(T(STR_LABEL_M220_FAILED)); break;
       }
@@ -289,7 +291,7 @@ void hideLabelPrintOverlays() {
   s_fetch_pending = false;
   s_open_pending = false;
   s_back_pending = false;
-  s_scan_pending = s_m220_pending = false;
+  s_scan_pending = s_m220_pending = s_restore_presets_pending = false;
   s_m220_spool = 0;
   s_width_label = nullptr;
 }
