@@ -11,6 +11,7 @@
 #include "services/wifi_manager.h"
 #include "ui/navigation.h"
 #include "ui/more_info_screen.h"
+#include "ui/label_preset_selection.h"
 #include "ui/ui_common.h"
 
 namespace {
@@ -37,11 +38,7 @@ static void addPresetRow(int id, const char* name) {
   lv_obj_set_height(row, 42);
   lv_obj_set_style_bg_color(row, lv_color_hex(id == prefsGetInt("label_preset", 0) ? 0x174f46 : 0x102035), 0);
   lv_obj_set_style_radius(row, 6, 0);
-  lv_obj_add_event_cb(row, [](lv_event_t* e) {
-    const int id = filamanLabelPresetId(lv_event_get_user_data(e));
-    prefsPutInt("label_preset", id);
-    fillList();
-  }, LV_EVENT_CLICKED, (void*)(intptr_t)id);
+  lv_obj_add_event_cb(row, labelPresetRowCb, LV_EVENT_CLICKED, (void*)(intptr_t)id);
   lv_obj_t* label = lv_label_create(row);
   lv_label_set_text(label, name);
   lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);

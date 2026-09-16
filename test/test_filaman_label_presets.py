@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Behavioral checks for FilaMan preset selection and parsing."""
 import subprocess
+import tempfile
 from pathlib import Path
 
 root = Path(__file__).parents[1]
 json_include = root / ".pio/libdeps/wt32-sc01-plus/ArduinoJson/src"
-source = r'''
+parser_source = r'''
 #include <assert.h>
 #include "services/filaman_label_preset_parse.h"
 
 int main() {
-  assert(filamanLabelPresetId((void*)7) == 7);
   FilaManLabelPreset presets[2];
   size_t count = 99;
   assert(filamanParseLabelPresets("[{\"id\":7,\"name\":\"Saved\"},{\"id\":-1,\"name\":\"Bad\"}]", presets, 2, &count) < 0);
@@ -19,8 +19,39 @@ int main() {
 '''
 result = subprocess.run(
     ["g++", "-std=c++11", f"-I{root / 'src'}", f"-I{json_include}", "-x", "c++", "-", "-o", "/tmp/test_filaman_label_presets"],
-    input=source, text=True, capture_output=True,
+    input=parser_source, text=True, capture_output=True,
 )
 assert result.returncode == 0, result.stderr
 result = subprocess.run(["/tmp/test_filaman_label_presets"], capture_output=True, text=True)
 assert result.returncode == 0, result.stderr
+
+with tempfile.TemporaryDirectory() as temp:
+    temp = Path(temp)
+    (temp / "lvgl.h").write_text('''
+typedef struct { void* user_data; } lv_obj_t;
+typedef struct { void* user_data; lv_obj_t* target; } lv_event_t;
+static inline void* lv_event_get_user_data(lv_event_t* e) { return e->user_data; }
+static inline lv_obj_t* lv_event_get_target(lv_event_t* e) { return e->target; }
+static inline void* lv_obj_get_user_data(lv_obj_t* obj) { return obj->user_data; }
+''')
+    (temp / "services").mkdir()
+    (temp / "services/prefs_store.h").write_text('extern bool prefsPutInt(const char*, int);')
+    callback_source = r'''
+#include <assert.h>
+#include "ui/label_preset_selection.h"
+static int stored = 0;
+bool prefsPutInt(const char*, int id) { stored = id; return true; }
+int main() {
+  lv_obj_t target = {(void*)99};
+  lv_event_t event = {(void*)7, &target};
+  labelPresetRowCb(&event);
+  assert(stored == 7);
+}
+'''
+    result = subprocess.run(
+        ["g++", "-std=c++11", f"-I{temp}", f"-I{root / 'src'}", "-x", "c++", "-", str(root / "src/ui/label_preset_selection.cpp"), "-o", "/tmp/test_filaman_label_callback"],
+        input=callback_source, text=True, capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    result = subprocess.run(["/tmp/test_filaman_label_callback"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
