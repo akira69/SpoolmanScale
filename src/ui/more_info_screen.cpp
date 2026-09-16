@@ -653,7 +653,8 @@ void buildMoreInfoScreen() {
     lv_obj_t *btn_label = lv_btn_create(hdr);
     lv_obj_set_size(btn_label, 116, 34);
     lv_obj_set_pos(btn_label, 282, 9);
-    lv_obj_add_event_cb(btn_label, [](lv_event_t*) { requestLabelPresetScreen(sm_id); }, LV_EVENT_CLICKED, nullptr);
+    styleOutlineButton(btn_label);
+    lv_obj_add_event_cb(btn_label, [](lv_event_t*) { requestLabelPreviewScreen(sm_id); }, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *label = lv_label_create(btn_label);
     lv_label_set_text(label, T(STR_LABEL_PRINT));
     lv_obj_center(label);

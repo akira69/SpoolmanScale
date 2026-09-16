@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <BLEDevice.h>
+#include <esp_heap_caps.h>
 #include <esp_gattc_api.h>
 #include <freertos/queue.h>
 #include <cstdio>
@@ -58,24 +59,47 @@ bool connectEventComplete(uint8_t expected) {
         event == expected) return true;
   return false;
 }
+
+class M220ScanCollector : public BLEAdvertisedDeviceCallbacks {
+ public:
+  M220ScanCollector(M220Device* devices, size_t max_devices)
+      : out(devices), capacity(max_devices) {}
+
+  void onResult(BLEAdvertisedDevice device) override {
+    const std::string name = device.getName();
+    // M-series printers can advertise their Q-prefixed serial instead of M220.
+    if (name.find("M220") == std::string::npos &&
+        !(name.size() >= 10 && name[0] == 'Q')) return;
+    const std::string address = device.getAddress().toString();
+    for (size_t i = 0; i < count; ++i)
+      if (strcmp(out[i].address, address.c_str()) == 0) return;
+    if (count >= capacity) return;
+    snprintf(out[count].name, sizeof(out[count].name), "%s", name.c_str());
+    snprintf(out[count].address, sizeof(out[count].address), "%s", address.c_str());
+    ++count;
+  }
+
+  size_t count = 0;
+
+ private:
+  M220Device* out;
+  size_t capacity;
+};
 }
 
 size_t phomemoM220Scan(M220Device* out, size_t capacity) {
   BLEDevice::init("");
   BLEScan* scan = BLEDevice::getScan();
   scan->setActiveScan(true);
-  BLEScanResults results = scan->start(4, false);
-  size_t count = 0;
-  for (int i = 0; i < results.getCount() && count < capacity; ++i) {
-    BLEAdvertisedDevice device = results.getDevice(i);
-    std::string name = device.getName();
-    if (name.find("M220") == std::string::npos) continue;
-    snprintf(out[count].name, sizeof(out[count].name), "%s", name.c_str());
-    snprintf(out[count].address, sizeof(out[count].address), "%s", device.getAddress().toString().c_str());
-    ++count;
-  }
   scan->clearResults();
-  return count;
+  M220ScanCollector collector(out, capacity);
+  // With duplicate filtering the library keeps the first packet for each
+  // address and drops later scan responses, which may carry the printer name.
+  scan->setAdvertisedDeviceCallbacks(&collector, true);
+  scan->start(8, false);
+  scan->setAdvertisedDeviceCallbacks(nullptr);
+  scan->clearResults();
+  return collector.count;
 }
 
 bool phomemoM220Print(const char* address, const LabelRaster& image,
@@ -84,7 +108,12 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
   if (error_size) error[0] = 0;
   if (!address || !*address) return fail("Select an M220 printer first.");
   if (!labelRasterPaddingValid(image)) return fail("Invalid label image.");
+  if (image.width > 576) return fail("M220 width exceeds print head.");
   if (s_client_unresolved) return fail("M220 BLE cleanup pending. Restart scale before retrying.");
+  Serial.printf("M220 before client: heap=%u largest=%u psram=%u\n",
+                unsigned(ESP.getFreeHeap()),
+                unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                unsigned(ESP.getFreePsram()));
   BLEDevice::init("");
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
@@ -124,31 +153,57 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     s_write_handle = write->getHandle();
     const size_t chunk = m220WriteChunk(client->getMTU());
     const bool response = write->canWrite();
-    auto send = [&](const uint8_t* data, size_t length) {
+    Serial.printf("M220 BLE connected: MTU=%u chunk=%u response=%u raster=%ux%u (%u bytes) heap=%u largest=%u psram=%u\n",
+                  client->getMTU(), unsigned(chunk), unsigned(response),
+                  unsigned(image.width), unsigned(image.height), unsigned(image.length),
+                  unsigned(ESP.getFreeHeap()),
+                  unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                  unsigned(ESP.getFreePsram()));
+    auto send = [&](const char* stage, const uint8_t* data, size_t length) {
       for (size_t pos = 0; pos < length; pos += chunk) {
-        if (!client->isConnected()) return false;
+        if (!client->isConnected()) {
+          Serial.printf("M220 %s disconnected at %u/%u\n", stage, unsigned(pos), unsigned(length));
+          return false;
+        }
         xQueueReset(s_write_events);
         esp_err_t result = esp_ble_gattc_write_char(
             client->getGattcIf(), client->getConnId(), write->getHandle(),
             min(chunk, length - pos), const_cast<uint8_t*>(data + pos),
             response ? ESP_GATT_WRITE_TYPE_RSP : ESP_GATT_WRITE_TYPE_NO_RSP,
             ESP_GATT_AUTH_REQ_NONE);
-        if (result != ESP_OK) return false;
+        if (result != ESP_OK) {
+          Serial.printf("M220 %s enqueue failed at %u/%u: %d\n", stage, unsigned(pos), unsigned(length), int(result));
+          return false;
+        }
         esp_gatt_status_t status;
-        if (xQueueReceive(s_write_events, &status, pdMS_TO_TICKS(3000)) != pdTRUE ||
-            status != ESP_GATT_OK) return false;
-        if (!client->isConnected()) return false;
+        if (xQueueReceive(s_write_events, &status, pdMS_TO_TICKS(3000)) != pdTRUE) {
+          Serial.printf("M220 %s write timeout at %u/%u, connected=%u\n", stage, unsigned(pos), unsigned(length), unsigned(client->isConnected()));
+          return false;
+        }
+        if (status != ESP_GATT_OK) {
+          Serial.printf("M220 %s GATT status %d at %u/%u\n", stage, int(status), unsigned(pos), unsigned(length));
+          return false;
+        }
+        if (!client->isConnected()) {
+          Serial.printf("M220 %s disconnected after %u/%u\n", stage, unsigned(pos), unsigned(length));
+          return false;
+        }
         delay(20);
+        if (!strcmp(stage, "raster") && pos && pos % 4096 < chunk)
+          Serial.printf("M220 raster %u/%u heap=%u\n", unsigned(pos), unsigned(length), unsigned(ESP.getFreeHeap()));
       }
+      Serial.printf("M220 %s sent %u bytes, heap=%u largest=%u\n", stage, unsigned(length),
+                    unsigned(ESP.getFreeHeap()),
+                    unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
       return true;
     };
     const uint8_t init[] = {0x1b, 0x40};
     const uint8_t density[] = {0x1b, 0x37, 0x07, 0x64, 0x64};
     const auto header = m220RasterHeader(image.width, image.height);
     const uint8_t feed[] = {0x1b, 0x4a, 0x20};
-    if (!send(init, sizeof(init)) || !send(density, sizeof(density)) ||
-        !send(header.data(), header.size()) || !send(image.pixels, image.length) ||
-        !send(feed, sizeof(feed))) { fail("M220 write failed or disconnected."); break; }
+    if (!send("init", init, sizeof(init)) || !send("density", density, sizeof(density)) ||
+        !send("header", header.data(), header.size()) || !send("raster", image.pixels, image.length) ||
+        !send("feed", feed, sizeof(feed))) { fail("M220 write failed or disconnected."); break; }
     ok = true;
   } while (false);
   if (client->isConnected()) client->disconnect();

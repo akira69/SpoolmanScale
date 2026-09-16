@@ -1,51 +1,59 @@
 #include "label_print_screen.h"
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <esp_heap_caps.h>
 #include <lvgl.h>
 
+#include "app/app_state.h"
+#include "services/backend.h"
 #include "services/filaman_api.h"
 #include "services/filaman_labels.h"
-#include "services/phomemo_m220.h"
 #include "services/filaman_print_pending.h"
-#include "services/http_progress.h"
-#include "app/app_state.h"
-#include "lang.h"
-#include "services/backend.h"
+#include "services/phomemo_m220.h"
 #include "services/prefs_store.h"
 #include "services/wifi_manager.h"
-#include "ui/navigation.h"
-#include "ui/more_info_screen.h"
 #include "ui/label_preset_selection.h"
+#include "ui/more_info_screen.h"
+#include "ui/navigation.h"
+#include "ui/printer_settings_screen.h"
 #include "ui/ui_common.h"
+#include "lang.h"
 
 namespace {
 constexpr size_t kPresetCapacity = 64;
-static lv_obj_t* s_screen = nullptr;
-static lv_obj_t* s_list = nullptr;
-static lv_obj_t* s_status = nullptr;
-static bool s_open_pending = false;
-static bool s_fetch_pending = false;
-static bool s_back_pending = false;
-static bool s_restore_presets_pending = false;
-static bool s_m220_pending = false;
-static int s_m220_spool = 0, s_m220_preset = 0;
-static char s_m220_address[18] = {};
-static uint16_t s_requested_width = 576;
-static FilaManPrintPending s_print;
-static int s_spool_id = 0;
-static FilaManLabelPreset s_presets[kPresetCapacity];
-static size_t s_count = 0;
+lv_obj_t* screen = nullptr;
+lv_obj_t* list = nullptr;
+lv_obj_t* status = nullptr;
+lv_obj_t* pc_button = nullptr;
+lv_obj_t* printer_button = nullptr;
+FilaManLabelPreset presets[kPresetCapacity];
+size_t preset_count = 0;
+LabelRaster preview{};
+FilaManPrintPending pc_request;
+int spool_id = 0;
+bool preset_page = false;
+bool preset_from_preview = false;
+bool open_pending = false;
+bool settings_pending = false;
+bool change_pending = false;
+bool back_pending = false;
+bool fetch_pending = false;
+bool refresh_rows_pending = false;
+bool print_pending = false;
 
-static void fillList();
-
-static void setStatus(const char* text) {
-  if (s_status) lv_label_set_text(s_status, text);
+void setStatus(const char* message) {
+  if (status) lv_label_set_text(status, message);
 }
 
-static void addPresetRow(int id, const char* name) {
-  lv_obj_t* row = lv_btn_create(s_list);
-  lv_obj_set_width(row, 392);
-  lv_obj_set_height(row, 42);
+void setHttpError(const char* message, int code) {
+  if (status) lv_label_set_text_fmt(status, "%s (%d)", message, code);
+}
+
+void addPresetRow(int id, const char* name) {
+  if (!lvPoolHasRoomForRow()) return;
+  lv_obj_t* row = lv_btn_create(list);
+  lv_obj_set_size(row, 392, 42);
   lv_obj_set_style_bg_color(row, lv_color_hex(id == prefsGetInt("label_preset", 0) ? 0x174f46 : 0x102035), 0);
   lv_obj_set_style_radius(row, 6, 0);
   lv_obj_add_event_cb(row, labelPresetRowCb, LV_EVENT_CLICKED, (void*)(intptr_t)id);
@@ -56,186 +64,280 @@ static void addPresetRow(int id, const char* name) {
   lv_obj_center(label);
 }
 
-static void fillList() {
-  if (!s_list) return;
-  lv_obj_clean(s_list);
+void fillPresetList() {
+  if (!list) return;
+  lv_obj_clean(list);
   addPresetRow(0, T(STR_LABEL_DEFAULT));
-  for (size_t i = 0; i < s_count; ++i) addPresetRow(s_presets[i].id, s_presets[i].name);
+  for (size_t i = 0; i < preset_count; ++i) addPresetRow(presets[i].id, presets[i].name);
 }
 
-static void fetchPresets() {
-  if (!s_screen) return;
+void fetchPresets() {
+  if (!screen || !preset_page) return;
   if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
   setStatus(T(STR_LABEL_LOADING));
+  lv_refr_now(nullptr);
   const int code = filamanListLabelPresets(backendBaseUrl(), filamanApiKey(),
-                                           s_presets, kPresetCapacity, &s_count);
+                                           presets, kPresetCapacity, &preset_count);
   if (code != 200) {
-    s_count = 0;
-    fillList();
+    preset_count = 0;
+    fillPresetList();
     switch (code) {
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
       case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-      default: setStatus(T(STR_LABEL_LOAD_FAIL)); break;
+      default: setHttpError(T(STR_LABEL_LOAD_FAIL), code); break;
     }
     return;
   }
-  int selected = prefsGetInt("label_preset", 0);
+  const int selected = prefsGetInt("label_preset", 0);
   bool found = selected == 0;
-  for (size_t i = 0; i < s_count; ++i) if (s_presets[i].id == selected) found = true;
+  for (size_t i = 0; i < preset_count; ++i)
+    if (presets[i].id == selected) found = true;
   if (!found) {
     prefsPutInt("label_preset", 0);
     setStatus(T(STR_LABEL_PRESET_REMOVED));
-  } else if (!s_count) {
-    setStatus(T(STR_LABEL_NONE));
-  } else {
-    setStatus("");
-  }
-  fillList();
+  } else if (!preset_count) setStatus(T(STR_LABEL_NONE));
+  else setStatus("");
+  fillPresetList();
 }
 
-static void showScreen() {
-  if (!backendIsFilaMan() || s_spool_id <= 0 || !sm_found || sm_id != s_spool_id) return;
-  hideAllOverlays();
-  releaseScreen(&s_screen);
-  s_screen = lv_obj_create(lv_scr_act());
-  lv_obj_set_size(s_screen, 480, 320);
-  lv_obj_set_style_bg_color(s_screen, lv_color_hex(0x0b1525), 0);
-  lv_obj_set_style_border_width(s_screen, 0, 0);
-  lv_obj_set_style_pad_all(s_screen, 0, 0);
-  lv_obj_clear_flag(s_screen, LV_OBJ_FLAG_SCROLLABLE);
+void buildPresetScreen() {
+  releaseScreen(&screen);
+  filamanFreeLabel(&preview);
+  list = status = pc_button = printer_button = nullptr;
+  preset_page = true;
+  screen = buildOverlayScreen();
+  buildSubHeader(screen, T(STR_LABEL_PRESET_TITLE), [](lv_event_t*) { back_pending = true; });
 
-  lv_obj_t* title = lv_label_create(s_screen);
-  lv_label_set_text(title, T(STR_LABEL_PRESET_TITLE));
-  lv_obj_set_style_text_color(title, lv_color_hex(0x28d49a), 0);
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_ext_20, 0);
-  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 12);
-
-  lv_obj_t* back = lv_btn_create(s_screen);
-  lv_obj_set_size(back, 82, 34);
-  lv_obj_set_pos(back, 12, 8);
-  lv_obj_add_event_cb(back, [](lv_event_t*) { s_back_pending = true; }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* back_label = lv_label_create(back);
-  lv_label_set_text(back_label, LV_SYMBOL_LEFT);
-  lv_obj_center(back_label);
-
-  lv_obj_t* refresh = lv_btn_create(s_screen);
+  lv_obj_t* refresh = lv_btn_create(screen);
   lv_obj_set_size(refresh, 100, 34);
   lv_obj_set_pos(refresh, 368, 8);
-  lv_obj_add_event_cb(refresh, [](lv_event_t*) { s_fetch_pending = true; }, LV_EVENT_CLICKED, nullptr);
+  styleOutlineButton(refresh);
+  lv_obj_add_event_cb(refresh, [](lv_event_t*) { fetch_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* refresh_label = lv_label_create(refresh);
   lv_label_set_text(refresh_label, T(STR_LABEL_REFRESH));
   lv_obj_center(refresh_label);
 
-  s_status = lv_label_create(s_screen);
-  lv_obj_set_width(s_status, 430);
-  lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_color(s_status, lv_color_hex(0xb7c9dc), 0);
-  lv_obj_set_pos(s_status, 25, 48);
+  status = lv_label_create(screen);
+  lv_obj_set_width(status, 440);
+  lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(status, lv_color_hex(0xb7c9dc), 0);
+  lv_obj_set_pos(status, 20, 56);
 
-  s_list = lv_obj_create(s_screen);
-  lv_obj_set_size(s_list, 420, 142);
-  lv_obj_set_pos(s_list, 30, 104);
-  lv_obj_set_flex_flow(s_list, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_all(s_list, 8, 0);
-  lv_obj_set_style_pad_row(s_list, 6, 0);
-  lv_obj_set_style_bg_color(s_list, lv_color_hex(0x09111e), 0);
-  fillList();
-  lv_obj_t* pc = lv_btn_create(s_screen);
-  lv_obj_set_size(pc, 180, 38);
-  lv_obj_set_pos(pc, 45, 252);
-  lv_obj_add_event_cb(pc, [](lv_event_t*) {
-    if (!s_print.request(s_spool_id, prefsGetInt("label_preset", 0))) return;
-    setStatus(T(STR_LABEL_PC_PENDING));
+  list = lv_obj_create(screen);
+  lv_obj_set_size(list, 420, 215);
+  lv_obj_set_pos(list, 30, 91);
+  lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_all(list, 8, 0);
+  lv_obj_set_style_pad_row(list, 6, 0);
+  lv_obj_set_style_bg_color(list, lv_color_hex(0x09111e), 0);
+  fillPresetList();
+  fetch_pending = true;
+  lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
+}
+
+// The server's packed mono1 raster can be displayed without a PNG decoder.
+// Keep a small indexed thumbnail on screen and the full raster for BLE.
+bool drawPreview() {
+  const uint32_t width = preview.rotated ? preview.height : preview.content_width;
+  const uint32_t height = preview.rotated ? preview.content_width : preview.height;
+  const bool width_limited = width * 160 > height * 420;
+  const uint32_t target_width = width_limited ? 420 : width * 160 / height;
+  const uint32_t target_height = width_limited ? height * 420 / width : 160;
+  if (!target_width || !target_height) return false;
+  const size_t row_bytes = (target_width + 7) / 8;
+  const size_t bytes = 8 + row_bytes * target_height;
+  uint8_t* thumbnail = static_cast<uint8_t*>(heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM));
+  if (!thumbnail) return false;
+  memset(thumbnail, 0, bytes);
+  for (uint32_t y = 0; y < target_height; ++y) {
+    const uint32_t source_y = y * height / target_height;
+    for (uint32_t x = 0; x < target_width; ++x) {
+      const uint32_t source_x = x * width / target_width;
+      if (labelRasterPreviewBlack(preview, source_x, source_y))
+        thumbnail[8 + y * row_bytes + x / 8] |= 0x80 >> (x % 8);
+    }
+  }
+  lv_obj_t* canvas = lv_canvas_create(screen);
+  lv_canvas_set_buffer(canvas, thumbnail, target_width, target_height, LV_IMG_CF_INDEXED_1BIT);
+  lv_canvas_set_palette(canvas, 0, lv_color_white());
+  lv_canvas_set_palette(canvas, 1, lv_color_black());
+  lv_obj_add_event_cb(canvas, [](lv_event_t* e) {
+    free(lv_event_get_user_data(e));
+  }, LV_EVENT_DELETE, thumbnail);
+  lv_obj_set_pos(canvas, (480 - target_width) / 2, 82 + (160 - target_height) / 2);
+  return true;
+}
+
+void fetchPreview() {
+  if (!screen || preset_page) return;
+  if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
+  setStatus(T(STR_LABEL_M220_FETCH));
+  lv_refr_now(nullptr);
+  const int saved_width = prefsGetInt("m220_width", 576);
+  const uint16_t width = saved_width >= 384 && saved_width <= 576 && saved_width % 8 == 0
+    ? saved_width : 576;
+  const int code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
+                                         spool_id, prefsGetInt("label_preset", 0),
+                                         width, &preview);
+  if (code != 200) {
+    switch (code) {
+      case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
+      case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
+      case FILAMAN_LABEL_NO_PSRAM: setStatus(T(STR_LABEL_M220_NO_PSRAM)); break;
+      default: setHttpError(T(STR_LABEL_M220_FAILED), code); break;
+    }
+    return;
+  }
+  if (!drawPreview()) {
+    setStatus(T(STR_LABEL_M220_NO_PSRAM));
+    filamanFreeLabel(&preview);
+    return;
+  }
+  setStatus("");
+  lv_obj_clear_state(pc_button, LV_STATE_DISABLED);
+  lv_obj_clear_state(printer_button, LV_STATE_DISABLED);
+}
+
+void buildPreviewScreen() {
+  releaseScreen(&screen);
+  filamanFreeLabel(&preview);
+  list = status = pc_button = printer_button = nullptr;
+  preset_page = false;
+  screen = buildOverlayScreen();
+  buildSubHeader(screen, T(STR_LABEL_PREVIEW), [](lv_event_t*) { back_pending = true; });
+
+  lv_obj_t* change = lv_btn_create(screen);
+  lv_obj_set_size(change, 126, 34);
+  lv_obj_set_pos(change, 342, 8);
+  styleOutlineButton(change);
+  lv_obj_add_event_cb(change, [](lv_event_t*) { change_pending = true; }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* change_label = lv_label_create(change);
+  lv_label_set_text(change_label, T(STR_LABEL_CHANGE_PRESET));
+  lv_obj_center(change_label);
+
+  status = lv_label_create(screen);
+  lv_obj_set_width(status, 440);
+  lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(status, lv_color_hex(0xb7c9dc), 0);
+  lv_obj_set_pos(status, 20, 54);
+
+  pc_button = lv_btn_create(screen);
+  lv_obj_set_size(pc_button, 180, 38);
+  lv_obj_set_pos(pc_button, 45, 261);
+  styleOutlineButton(pc_button);
+  lv_obj_add_event_cb(pc_button, [](lv_event_t*) {
+    if (preview.pixels && pc_request.request(spool_id, prefsGetInt("label_preset", 0)))
+      setStatus(T(STR_LABEL_PC_PENDING));
   }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* pc_label = lv_label_create(pc);
+  lv_obj_t* pc_label = lv_label_create(pc_button);
   lv_label_set_text(pc_label, T(STR_LABEL_PC_OPEN));
   lv_obj_center(pc_label);
-  lv_obj_t* printer = lv_btn_create(s_screen);
-  lv_obj_set_size(printer, 180, 38); lv_obj_set_pos(printer, 255, 252);
-  lv_obj_add_event_cb(printer, [](lv_event_t*) {
-    if (s_m220_pending || s_m220_spool) return;
-    String address = prefsGetString("m220_addr");
-    if (address.isEmpty()) { setStatus(T(STR_LABEL_M220_SELECT)); return; }
-    snprintf(s_m220_address, sizeof(s_m220_address), "%s", address.c_str());
-    s_m220_spool = s_spool_id;
-    s_m220_preset = prefsGetInt("label_preset", 0);
-    int saved_width = prefsGetInt("m220_width", 576);
-    s_requested_width = saved_width >= 384 && saved_width <= 1024 && saved_width % 8 == 0
-      ? saved_width : 576;
-    s_m220_pending = true;
-    setStatus(T(STR_LABEL_M220_FETCH));
+  lv_obj_add_state(pc_button, LV_STATE_DISABLED);
+
+  printer_button = lv_btn_create(screen);
+  lv_obj_set_size(printer_button, 180, 38);
+  lv_obj_set_pos(printer_button, 255, 261);
+  styleOutlineButton(printer_button);
+  lv_obj_add_event_cb(printer_button, [](lv_event_t*) {
+    if (preview.pixels) print_pending = true;
   }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* printer_text = lv_label_create(printer);
-  lv_label_set_text(printer_text, T(STR_LABEL_M220_PRINT)); lv_obj_center(printer_text);
-  s_fetch_pending = true;
+  lv_obj_t* printer_label = lv_label_create(printer_button);
+  lv_label_set_text(printer_label, T(STR_LABEL_M220_PRINT));
+  lv_obj_center(printer_label);
+  lv_obj_add_state(printer_button, LV_STATE_DISABLED);
+
+  fetch_pending = true;
+  lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
 }
 }  // namespace
 
-void requestLabelPresetScreen(int spool_id) {
-  s_spool_id = spool_id;
-  s_open_pending = true;
+void requestLabelPreviewScreen(int selected_spool_id) {
+  spool_id = selected_spool_id;
+  open_pending = true;
 }
 
-void requestLabelPresetRefresh() { s_restore_presets_pending = true; }
+void requestLabelPresetSettingsScreen() { settings_pending = true; }
+
+void requestLabelPresetRefresh() { refresh_rows_pending = true; }
 
 void handleLabelPrintDeferredActions() {
-  if (s_back_pending) {
-    s_back_pending = false;
-    s_print.cancel();
-    s_fetch_pending = false;
-    s_m220_pending = s_restore_presets_pending = false;
-    s_m220_spool = 0;
-    s_open_pending = false;
-    releaseScreen(&s_screen);
-    s_list = nullptr;
-    s_status = nullptr;
-    showMoreInfoScreen();
+  if (back_pending) {
+    back_pending = false;
+    if (preset_page) {
+      if (preset_from_preview) buildPreviewScreen();
+      else {
+        hideLabelPrintOverlays();
+        requestPrinterSettingsScreen();
+      }
+    } else {
+      hideLabelPrintOverlays();
+      showMoreInfoScreen();
+    }
     return;
   }
-  if (s_open_pending) { s_open_pending = false; showScreen(); }
-  if (s_fetch_pending) { s_fetch_pending = false; fetchPresets(); }
-  if (s_restore_presets_pending) { s_restore_presets_pending = false; fillList(); }
-  if (s_m220_pending && s_screen) {
-    s_m220_pending = false;
-    LabelRaster image{};
-    int code = -1;
-    if (wifiManagerIsConnected()) {
-      HttpStallTime stall;
-      code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
-                                   s_m220_spool, s_m220_preset, s_requested_width, &image);
-    }
-    s_m220_spool = 0;
-    if (code == 200) {
-      setStatus(T(STR_LABEL_M220_SEND));
-      char error[80];
-      bool sent = phomemoM220Print(s_m220_address, image, error, sizeof(error));
-      setStatus(sent ? T(STR_LABEL_M220_SENT) : error);
-    } else {
-      switch (code) {
-        case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
-        case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-        case 404: fetchPresets(); setStatus(T(STR_LABEL_PC_MISSING)); break;
-        case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
-        case FILAMAN_LABEL_NO_PSRAM: setStatus(T(STR_LABEL_M220_NO_PSRAM)); break;
-        default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_M220_FAILED : STR_LABEL_NO_WIFI)); break;
-      }
-    }
-    filamanFreeLabel(&image);
+  if (open_pending) {
+    open_pending = false;
+    hideAllOverlays();
+    buildPreviewScreen();
   }
-  int print_spool_id = 0, print_preset_id = 0;
-  if (s_screen && s_print.take(&print_spool_id, &print_preset_id)) {
-    int request_id = 0;
-    int code = -1;
-    if (wifiManagerIsConnected()) {
-      HttpStallTime stall;
-      code = filamanRequestLabelPrint(backendBaseUrl(), filamanApiKey(),
-                                      print_spool_id, print_preset_id, &request_id);
+  if (settings_pending) {
+    settings_pending = false;
+    preset_from_preview = false;
+    hideAllOverlays();
+    buildPresetScreen();
+  }
+  if (change_pending) {
+    change_pending = false;
+    preset_from_preview = true;
+    buildPresetScreen();
+  }
+  if (refresh_rows_pending) {
+    refresh_rows_pending = false;
+    fillPresetList();
+  }
+  if (fetch_pending) {
+    fetch_pending = false;
+    if (preset_page) fetchPresets();
+    else fetchPreview();
+  }
+  if (print_pending && screen && !preset_page) {
+    print_pending = false;
+    String address = prefsGetString("m220_addr");
+    if (address.isEmpty()) setStatus(T(STR_LABEL_M220_SELECT));
+    else if (preview.pixels) {
+      // This scale currently uses 40 x 30 mm M220 stock at 203 DPI.
+      if (preview.content_width != 320 || preview.height != 240) {
+        setStatus(T(STR_LABEL_M220_MEDIA));
+        return;
+      }
+      setStatus(T(STR_LABEL_M220_SEND));
+      lv_refr_now(nullptr);
+      char error[80];
+      // The label is already in PSRAM. Free the WiFi stack's internal heap
+      // while the BLE stack sends it, then reconnect for the next API call.
+      const bool resume_wifi = wifiManagerIsConnected();
+      if (resume_wifi) {
+        WiFi.disconnect(true);
+        delay(100);
+        Serial.printf("M220 WiFi stopped: heap=%u\n", unsigned(ESP.getFreeHeap()));
+      }
+      const bool sent = phomemoM220Print(address.c_str(), preview, error, sizeof(error));
+      if (resume_wifi) wifiManagerBegin(cfg_wifi_ssid, cfg_wifi_password);
+      setStatus(sent ? T(STR_LABEL_M220_SENT) : error);
     }
+  }
+  int request_spool = 0, request_preset = 0;
+  if (screen && pc_request.take(&request_spool, &request_preset)) {
+    int request_id = 0;
+    const int code = wifiManagerIsConnected()
+      ? filamanRequestLabelPrint(backendBaseUrl(), filamanApiKey(),
+                                 request_spool, request_preset, &request_id)
+      : -1;
     switch (code) {
       case 201: setStatus(T(STR_LABEL_PC_QUEUED)); break;
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
       case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-      case 404: fetchPresets(); setStatus(T(STR_LABEL_PC_MISSING)); break;
+      case 404: setStatus(T(STR_LABEL_PC_MISSING)); break;
       case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
       default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_PC_FAILED : STR_LABEL_NO_WIFI)); break;
     }
@@ -243,13 +345,11 @@ void handleLabelPrintDeferredActions() {
 }
 
 void hideLabelPrintOverlays() {
-  s_print.cancel();
-  releaseScreen(&s_screen);
-  s_list = nullptr;
-  s_status = nullptr;
-  s_fetch_pending = false;
-  s_open_pending = false;
-  s_back_pending = false;
-  s_m220_pending = s_restore_presets_pending = false;
-  s_m220_spool = 0;
+  pc_request.cancel();
+  releaseScreen(&screen);
+  filamanFreeLabel(&preview);
+  list = status = pc_button = printer_button = nullptr;
+  open_pending = settings_pending = change_pending = back_pending = false;
+  fetch_pending = refresh_rows_pending = print_pending = false;
+  preset_page = preset_from_preview = false;
 }

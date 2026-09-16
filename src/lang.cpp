@@ -833,6 +833,8 @@ const char* const STRINGS[][3] = {
     "Too many locations - not all shown",
     "Trop d'emplacements - tous ne sont pas affichés" },  // STR_LOCATION_LIMIT_HIT
   { "Label drucken", "Print label" }, // STR_LABEL_PRINT
+  { "Label-Vorschau", "Label preview" }, // STR_LABEL_PREVIEW
+  { "Vorlage ändern", "Change preset" }, // STR_LABEL_CHANGE_PRESET
   { "Label-Vorlage", "Label preset" }, // STR_LABEL_PRESET_TITLE
   { "Standard-Label", "Default label" }, // STR_LABEL_DEFAULT
   { "Aktualisieren", "Refresh" }, // STR_LABEL_REFRESH
@@ -853,6 +855,7 @@ const char* const STRINGS[][3] = {
   { "Auf M220 drucken", "Print on M220" }, // STR_LABEL_M220_PRINT
   { "Kein M220 gefunden", "No M220 found" }, // STR_LABEL_M220_NONE
   { "M220 auswählen", "Select an M220" }, // STR_LABEL_M220_SELECT
+  { "40x30 oder 30x40 mm Preset wählen", "Select a 40x30 or 30x40 mm preset" }, // STR_LABEL_M220_MEDIA
   { "Label wird geladen...", "Fetching label..." }, // STR_LABEL_M220_FETCH
   { "Sende an M220...", "Sending to M220..." }, // STR_LABEL_M220_SEND
   { "An Drucker gesendet", "Sent to printer" }, // STR_LABEL_M220_SENT

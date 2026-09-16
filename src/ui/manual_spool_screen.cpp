@@ -59,6 +59,7 @@ void buildScreen() {
   lv_obj_t* prev = lv_btn_create(screen);
   lv_obj_set_size(prev, 60, 32);
   lv_obj_set_pos(prev, 10, 54);
+  styleOutlineButton(prev);
   lv_obj_add_event_cb(prev, [](lv_event_t*) {
     if (page > 1) { --page; fetch_pending = true; }
   }, LV_EVENT_CLICKED, nullptr);
@@ -69,6 +70,7 @@ void buildScreen() {
   lv_obj_t* next = lv_btn_create(screen);
   lv_obj_set_size(next, 60, 32);
   lv_obj_set_pos(next, 410, 54);
+  styleOutlineButton(next);
   lv_obj_add_event_cb(next, [](lv_event_t*) {
     if (page_complete && page * rowsPerPage() < total) { ++page; fetch_pending = true; }
   }, LV_EVENT_CLICKED, nullptr);
@@ -102,6 +104,7 @@ void fetchSpools() {
   page_complete = false;
   if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
   setStatus(T(STR_SPOOLS_LOADING));
+  lv_refr_now(nullptr);
 
   SpiRamAllocator alloc;
   JsonDocument doc(&alloc);
