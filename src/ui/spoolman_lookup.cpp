@@ -568,8 +568,8 @@ static void setFromServerOrTag(lv_obj_t *lbl, const char *server, const char *fr
   else                          lv_label_set_text(lbl, "-");
 }
 
-void querySpoolmanById(int spool_id) {
-  if (!wifi_ok) return;
+bool querySpoolmanById(int spool_id) {
+  if (!wifi_ok) return false;
   Serial.printf("querySpoolmanById: ID=%d\n", spool_id);
   logSDf("Spoolman: query by ID=%d", spool_id);
   if (sd_verbose) logSDf("[verbose] heap=%d PSRAM=%d (before byID GET)",
@@ -585,7 +585,7 @@ void querySpoolmanById(int spool_id) {
       Serial.println("querySpoolmanById: JSON error");
       logSD("Spoolman byID: JSON error");
     }
-    return;
+    return false;
   }
   if (sd_verbose) logSDf("[verbose] heap=%d PSRAM=%d (after byID parse)",
     ESP.getFreeHeap(), ESP.getFreePsram());
@@ -724,6 +724,7 @@ void querySpoolmanById(int spool_id) {
 
   Serial.printf("querySpoolmanById OK: ID=%d %.1fg dried=%s\n", sm_id, sm_remaining, sm_last_dried);
   updateLinkButton();
+  return true;
 }
 
 // ============================================================

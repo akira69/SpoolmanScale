@@ -7,6 +7,7 @@
 #include "bambu/bambu_tag.h"
 #include "lang.h"
 #include "main_screen_helpers.h"
+#include "header_status.h"
 #include "spool_flow.h"
 
 
@@ -68,5 +69,6 @@ void clearTagDisplay() {
   link_tag_first_seen_ms = 0;
   g_tag_displayed = false;
   updateLinkButton();
+  updateHeaderStatus();
   Serial.println("Display cleared (no tag)");
 }

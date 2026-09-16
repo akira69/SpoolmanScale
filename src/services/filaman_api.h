@@ -295,6 +295,12 @@ int filamanGetSpoolListJson(const char* base_url, const char* api_key,
                             int page_size = 100, uint32_t timeout_ms = 15000,
                             DeserializationError* out_err = nullptr);
 
+// One active-spool page for the touchscreen browser. Avoids downloading the
+// entire inventory to show a limited number of LVGL rows.
+int filamanGetSpoolPageJson(const char* base_url, const char* api_key,
+                            int page, int page_size, JsonDocument& out_doc,
+                            int* out_total, uint32_t timeout_ms = 8000);
+
 // ---------- the device's own auto-assign settings ----------
 //
 // FilaMan can mark a spool as "pending" on every running printer driver for

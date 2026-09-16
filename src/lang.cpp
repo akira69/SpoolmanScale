@@ -632,6 +632,20 @@ const char* const STRINGS[][2] = {
   { "An Drucker gesendet", "Sent to printer" }, // STR_LABEL_M220_SENT
   { "Label konnte nicht geladen werden", "Could not fetch label" }, // STR_LABEL_M220_FAILED
   { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration." }, // STR_LABEL_M220_NO_PSRAM
+  { "Spulen", "Spools" }, // STR_SPOOLS_TITLE
+  { "Spulen laden...", "Loading spools..." }, // STR_SPOOLS_LOADING
+  { "Spulen nicht ladbar (HTTP %d)", "Could not load spools (HTTP %d)" }, // STR_SPOOLS_LOAD_FAIL
+  { "Keine aktiven Spulen", "No active spools" }, // STR_SPOOLS_EMPTY
+  { "Seite %d von %d (%d Spulen)", "Page %d of %d (%d spools)" }, // STR_SPOOLS_PAGE_FMT
+  { "Anzeigespeicher knapp; Spulen neu öffnen", "Display memory low; reopen Spools" }, // STR_SPOOLS_LOW_MEM
+  { "NFC-Tag zuerst entfernen", "Remove the NFC tag first" }, // STR_SPOOLS_REMOVE_TAG
+  { "Spule laden...", "Loading spool..." }, // STR_SPOOLS_OPENING
+  { "Spule konnte nicht geladen werden", "Could not load that spool" }, // STR_SPOOLS_OPEN_FAIL
+  { "Drucker", "Printer" }, // STR_PRINTER_TITLE
+  { "Kein Drucker ausgewählt", "No printer selected" }, // STR_PRINTER_NONE
+  { "Ausgewählt: %s", "Selected: %s" }, // STR_PRINTER_SELECTED_FMT
+  { "Drucker löschen", "Clear printer" }, // STR_PRINTER_CLEAR
+  { "Suche Drucker...", "Scanning for printers..." }, // STR_PRINTER_SCANNING
   { "Ortsabfrage bei Entnahme",      "Location on removal"                },  // STR_BTN_AUTO_LOC_POPUP
   { "Trocknungserinnerung",          "Drying Reminder"                    },  // STR_BTN_DRYING_REMINDER
   { "Trocknungserinnerung",          "Drying Reminder"                    },  // STR_DRYING_REMINDER_TITLE

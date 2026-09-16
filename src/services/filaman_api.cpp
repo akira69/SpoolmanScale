@@ -1408,6 +1408,35 @@ int filamanGetSpoolListJson(const char* base_url, const char* api_key,
   return 200;
 }
 
+int filamanGetSpoolPageJson(const char* base_url, const char* api_key,
+                            int page, int page_size, JsonDocument& out_doc,
+                            int* out_total, uint32_t timeout_ms) {
+  if (out_total) *out_total = 0;
+  out_doc.clear();
+  if (!hasBaseUrl(base_url) || page < 1 || page_size < 1 || page_size > FILAMAN_PAGE_MAX)
+    return -1;
+
+  HTTPClient http;
+  http.begin(String(base_url) + "/api/v1/spools?page=" + page + "&page_size=" + page_size);
+  http.setTimeout(timeout_ms);
+  addApiKey(http, api_key);
+  int code = http.GET();
+  if (code != 200) { http.end(); return code; }
+
+  SpiRamAllocator alloc;
+  JsonDocument raw(&alloc);
+  DeserializationError err = deserializeJson(raw, http.getStream());
+  http.end();
+  if (err) return -2;
+  JsonArrayConst items = raw["items"].as<JsonArrayConst>();
+  if (items.isNull()) return -2;
+  if (out_total) *out_total = raw["total"] | (int)items.size();
+  JsonArray dst = out_doc.to<JsonArray>();
+  for (JsonVariantConst item : items)
+    mapSpool(item.as<JsonObjectConst>(), dst.add<JsonObject>());
+  return 200;
+}
+
 // ============================================================
 //  DEVICE AUTO-ASSIGN
 // ============================================================

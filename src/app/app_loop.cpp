@@ -84,6 +84,8 @@
 #include "ui/main_screen_helpers.h"
 #include "ui/more_info_screen.h"
 #include "ui/label_print_screen.h"
+#include "ui/manual_spool_screen.h"
+#include "ui/printer_settings_screen.h"
 #include "ui/navigation.h"
 #include "ui/ota_menu.h"
 #include "ui/scale_menu.h"
@@ -267,6 +269,7 @@ static unsigned long tare_msg_ms = 0;
 lv_obj_t *lbl_ok_ptr = nullptr;
 
 static unsigned long last_tag_seen_ms = 0;    // last NFC detection
+void cancelPendingNfcClear() { last_tag_seen_ms = 0; }
 static unsigned long last_bambu_retry_ms = 0; // backoff between Bambu re-scans
 static unsigned long first_miss_ms = 0;       // start of the current detection gap
 static unsigned long tag_absent_since_ms = 0; // when the last removal was declared
@@ -718,6 +721,8 @@ void appLoop() {
   }
   handleMoreInfoDeferredActions();
   handleLabelPrintDeferredActions();
+  handleManualSpoolDeferredActions();
+  handlePrinterSettingsDeferredActions();
   handleAmsAssignDeferredActions();
   handleAmsViewDeferredActions();
   amsPickTick();
@@ -1490,7 +1495,7 @@ void appLoop() {
       if (found && uidLen == 4) {
         // ── MIFARE Classic (Bambu) ────────────────────────────
         last_tag_seen_ms = millis();
-        tag_present = true;
+        if (!tag_present) { tag_present = true; updateHeaderStatus(); }
         {
           char u[16];
           snprintf(u, sizeof(u), "%02X:%02X:%02X:%02X",
@@ -1620,7 +1625,7 @@ void appLoop() {
       } else if (found && uidLen == 7) {
         // ── NTAG detected ──────────────────────────────────────
         last_tag_seen_ms = millis();
-        tag_present = true;
+        if (!tag_present) { tag_present = true; updateHeaderStatus(); }
         nfc_absent_count = 0;   // see the comment in the Bambu branch above
         resetActivityTimer();
 
@@ -1758,6 +1763,7 @@ void appLoop() {
               (unsigned)(millis() - first_miss_ms), NFC_FAST_POLL_MAX);
             logSD("NFC: tag removed");
             tag_present = false;
+            updateHeaderStatus();
             tag_absent_since_ms = millis();
             nfc_absent_count = 0;
             last_tag_seen_ms = millis();

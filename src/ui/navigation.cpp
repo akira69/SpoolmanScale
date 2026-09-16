@@ -24,6 +24,8 @@
 #include "ui/wifi_portal_screen.h"
 #include "ui/more_info_screen.h"
 #include "ui/label_print_screen.h"
+#include "ui/manual_spool_screen.h"
+#include "ui/printer_settings_screen.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/header_status.h"
 #include "ui/settings_screen.h"
@@ -88,6 +90,8 @@ void hideAllOverlays() {
   hideSpoolFlowOverlays();
   hideMoreInfoOverlays();
   hideLabelPrintOverlays();
+  hideManualSpoolOverlays();
+  hidePrinterSettingsOverlays();
   hideAmsViewOverlays();
   webPinScreenHide();
   hideLanguageScreen();
