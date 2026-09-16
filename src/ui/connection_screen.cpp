@@ -13,6 +13,8 @@
 #include "ui_common.h"
 #include "wifi_info.h"
 #include "services/wifi_manager.h"
+#include "services/prefs_store.h"
+#include "ui/printer_settings_screen.h"
 
 
 void showWifiSetupScreen();
@@ -185,7 +187,7 @@ void buildConnectionScreen() {
   // "More options" button on the backend screen opens, one tap earlier; the
   // tile says which backend's options those are.
   lv_obj_t *btn_opts = lv_btn_create(scr_connection);
-  lv_obj_set_size(btn_opts, BTN_W, BTN_H);
+  lv_obj_set_size(btn_opts, backendIsFilaMan() ? HALF_W : BTN_W, BTN_H);
   lv_obj_set_pos(btn_opts, BTN_X, BTN_Y[2]);
   lv_obj_set_style_bg_color(btn_opts, lv_color_hex(UI_COL_ROW), 0);
   lv_obj_set_style_bg_color(btn_opts, lv_color_hex(UI_COL_ROW_PRESSED), LV_STATE_PRESSED);
@@ -218,6 +220,35 @@ void buildConnectionScreen() {
     else if (backendIsBamBuddy()) show_bambuddy_options_pending = true;
     else                          show_spoolman_options_pending = true;
   }, LV_EVENT_CLICKED, NULL);
+
+  if (backendIsFilaMan()) {
+    lv_obj_t *btn_printer = lv_btn_create(scr_connection);
+    lv_obj_set_size(btn_printer, HALF_W, BTN_H);
+    lv_obj_set_pos(btn_printer, HALF_X2, BTN_Y[2]);
+    lv_obj_set_style_bg_color(btn_printer, lv_color_hex(UI_COL_ROW), 0);
+    lv_obj_set_style_bg_color(btn_printer, lv_color_hex(UI_COL_ROW_PRESSED), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn_printer, UI_RADIUS_ROW, 0);
+    lv_obj_set_style_shadow_width(btn_printer, 0, 0);
+    lv_obj_add_event_cb(btn_printer, [](lv_event_t*) { requestPrinterSettingsScreen(); }, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *icon = lv_label_create(btn_printer);
+    lv_label_set_text(icon, "\xEF\x8A\x93");
+    lv_obj_set_style_text_color(icon, lv_color_hex(UI_COL_ACCENT), 0);
+    lv_obj_set_style_text_font(icon, UI_FONT_ICON, 0);
+    lv_obj_align(icon, LV_ALIGN_CENTER, 0, -24);
+    lv_obj_t *title = lv_label_create(btn_printer);
+    lv_label_set_text(title, T(STR_PRINTER_TITLE));
+    lv_obj_set_style_text_color(title, lv_color_hex(UI_COL_INK), 0);
+    lv_obj_set_style_text_font(title, UI_FONT_TITLE, 0);
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, 4);
+    lv_obj_t *sub = lv_label_create(btn_printer);
+    String printer_address = prefsGetString("m220_addr");
+    lv_label_set_text(sub, printer_address.isEmpty() ? T(STR_PRINTER_NONE) : printer_address.c_str());
+    lv_obj_set_style_text_color(sub, lv_color_hex(UI_COL_CAPTION), 0);
+    lv_obj_set_style_text_font(sub, UI_FONT_SMALL, 0);
+    lv_obj_set_width(sub, HALF_SUB_W);
+    lv_label_set_long_mode(sub, LV_LABEL_LONG_DOT);
+    lv_obj_align(sub, LV_ALIGN_CENTER, 0, 26);
+  }
 
   if (sd_verbose) logSD("[verbose] buildConnectionScreen: done");
 }

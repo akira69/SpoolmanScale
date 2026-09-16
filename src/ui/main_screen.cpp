@@ -27,6 +27,7 @@
 #include "ui/header_status.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/more_info_screen.h"
+#include "ui/manual_spool_screen.h"
 #include "ui/settings_screen.h"
 #include "ui/spool_flow.h"
 #include "ui/theme.h"
@@ -170,6 +171,12 @@ void buildUI() {
   lv_label_set_text(lbl_hdr_wifi, LV_SYMBOL_WIFI);
   lv_obj_set_style_text_color(lbl_hdr_wifi, lv_color_hex(0x606060), 0);
   lv_obj_set_style_text_font(lbl_hdr_wifi, &lv_font_montserrat_ext_12, 0);
+
+  lbl_hdr_bt = lv_label_create(hdr);
+  lv_label_set_text(lbl_hdr_bt, "\xEF\x8A\x93");  // Font Awesome Bluetooth (U+F293)
+  lv_obj_set_style_text_color(lbl_hdr_bt, lv_color_hex(0x28d49a), 0);
+  lv_obj_set_style_text_font(lbl_hdr_bt, &lv_font_montserrat_ext_12, 0);
+  lv_obj_add_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
 
   // A button like the AMS chip, and built the same way: it opens the tag
   // view. The label inside is still the reader's state - green "NFC", red
@@ -432,8 +439,12 @@ void buildUI() {
   lv_obj_set_style_border_color(btn_more, lv_color_hex(0x28d49a), 0);  // teal border
   lv_obj_set_style_radius(btn_more, 6, 0);
   lv_obj_set_style_shadow_width(btn_more, 0, 0);
-  lv_obj_add_event_cb(btn_more, [](lv_event_t *e){ logSD("BTN: Main -> MoreInfo"); showMoreInfoScreen(); }, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(btn_more, [](lv_event_t *e){
+    if (backendIsFilaMan() && !tag_present) requestManualSpoolScreen();
+    else showMoreInfoScreen();
+  }, LV_EVENT_CLICKED, NULL);
   lv_obj_t *lbl_more = lv_label_create(btn_more);
+  lbl_btn_more = lbl_more;
   char more_buf[24]; copyT(more_buf, sizeof(more_buf), STR_BTN_MORE_INFO);
   lv_label_set_text(lbl_more, more_buf);
   lv_obj_set_style_text_color(lbl_more, lv_color_hex(0x28d49a), 0);  // teal text
@@ -945,6 +956,7 @@ void buildUI() {
   // Header chips and the status bar address are packed from their real
   // widths, so this has to run after every label above exists.
   layoutHeaderChips();
+  updateHeaderStatus();
 
   page_main = lv_scr_act();
   // lbl_raw_info points to SM diff label on main screen (see above)

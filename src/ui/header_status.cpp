@@ -9,6 +9,8 @@
 #include "services/device_name.h"
 #include "services/mdns_service.h"
 #include "services/user_options.h"
+#include "services/prefs_store.h"
+#include "lang.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/theme.h"
 #include "services/wifi_manager.h"
@@ -41,7 +43,7 @@ void layoutHeaderChips() {
   lv_obj_t *prev = lbl_hdr_sm;
   // AMS first, so it lands directly left of the backend badge: it belongs to
   // the backend, and the two read as a pair.
-  lv_obj_t *chain[] = { btn_hdr_ams, lbl_hdr_scl, btn_hdr_nfc, lbl_hdr_wifi, lbl_hdr_sd };
+  lv_obj_t *chain[] = { btn_hdr_ams, lbl_hdr_scl, btn_hdr_nfc, lbl_hdr_bt, lbl_hdr_wifi, lbl_hdr_sd };
   for (unsigned i = 0; i < sizeof(chain) / sizeof(chain[0]); i++) {
     // Hidden counts as absent. lv_obj_align_to() reads nothing but the
     // reference object's geometry - the hidden flag never reaches it - so a
@@ -63,6 +65,16 @@ void updateHeaderStatus() {
   if (!lbl_hdr_wifi) return;
 
   lv_obj_set_style_text_color(lbl_hdr_wifi, wifiColor(), 0);
+
+  if (lbl_hdr_bt) {
+    if (backendIsFilaMan() && !prefsGetString("m220_addr").isEmpty())
+      lv_obj_clear_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_add_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
+  }
+  if (lbl_btn_more)
+    lv_label_set_text(lbl_btn_more,
+      backendIsFilaMan() && !tag_present ? T(STR_SPOOLS_TITLE) : T(STR_BTN_MORE_INFO));
 
   if (lbl_hdr_nfc) {
     lv_label_set_text(lbl_hdr_nfc, nfc_ok ? "NFC" : "NFC!");

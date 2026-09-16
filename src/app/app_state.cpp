@@ -201,6 +201,8 @@ lv_obj_t* s_ams_numpad_scr = nullptr;
 lv_obj_t* s_ams_numpad_lbl = nullptr;
 lv_obj_t *lbl_nfc_dot;
 lv_obj_t *lbl_hdr_wifi;
+lv_obj_t *lbl_hdr_bt = nullptr;
+lv_obj_t *lbl_btn_more = nullptr;
 lv_obj_t *lbl_hdr_nfc;
 lv_obj_t *lbl_hdr_scl = nullptr;
 lv_obj_t *lbl_hdr_scans;

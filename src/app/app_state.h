@@ -259,6 +259,8 @@ extern lv_obj_t *s_ams_numpad_scr;
 extern lv_obj_t *s_ams_numpad_lbl;
 extern lv_obj_t *lbl_nfc_dot;
 extern lv_obj_t *lbl_hdr_wifi;
+extern lv_obj_t *lbl_hdr_bt;
+extern lv_obj_t *lbl_btn_more;
 extern lv_obj_t *lbl_hdr_nfc;
 extern lv_obj_t *lbl_hdr_scl;
 extern lv_obj_t *lbl_hdr_scans;
