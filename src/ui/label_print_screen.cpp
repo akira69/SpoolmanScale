@@ -38,7 +38,7 @@ static void addPresetRow(int id, const char* name) {
   lv_obj_set_style_bg_color(row, lv_color_hex(id == prefsGetInt("label_preset", 0) ? 0x174f46 : 0x102035), 0);
   lv_obj_set_style_radius(row, 6, 0);
   lv_obj_add_event_cb(row, [](lv_event_t* e) {
-    const int id = (int)(intptr_t)lv_obj_get_user_data(lv_event_get_target(e));
+    const int id = filamanLabelPresetId(lv_event_get_user_data(e));
     prefsPutInt("label_preset", id);
     fillList();
   }, LV_EVENT_CLICKED, (void*)(intptr_t)id);
