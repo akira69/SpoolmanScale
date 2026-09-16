@@ -7,6 +7,10 @@
 #include "services/ams_slots.h"
 #include "services/filaman_label_preset_parse.h"
 
+// POST /api/v1/labels/spool/{id}/print-request using a user API key.
+int filamanRequestLabelPrint(const char* base_url, const char* api_key, int spool_id,
+                             int preset_id, int* request_id, uint32_t timeout_ms = 8000);
+
 // GET /api/v1/labels/presets. Returns HTTP status or a negative local error.
 // The list is either complete or rejected; it is never silently truncated.
 int filamanListLabelPresets(const char* base_url, const char* api_key,
