@@ -6,6 +6,17 @@
 
 #include "services/ams_slots.h"
 
+struct FilaManLabelPreset {
+  int id;
+  char name[64];
+};
+
+// GET /api/v1/labels/presets. Returns HTTP status or a negative local error.
+// The list is either complete or rejected; it is never silently truncated.
+int filamanListLabelPresets(const char* base_url, const char* api_key,
+                            FilaManLabelPreset* out, size_t capacity, size_t* count,
+                            uint32_t timeout_ms = 8000);
+
 // ============================================================
 //  FILAMAN HTTP LAYER
 //

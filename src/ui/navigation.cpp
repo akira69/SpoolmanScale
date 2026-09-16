@@ -23,6 +23,7 @@
 #include "ui/wifi_setup_screen.h"
 #include "ui/wifi_portal_screen.h"
 #include "ui/more_info_screen.h"
+#include "ui/label_print_screen.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/header_status.h"
 #include "ui/settings_screen.h"
@@ -87,6 +88,7 @@ void hideAllOverlays() {
   if (scr_wifi_portal) lv_obj_add_flag(scr_wifi_portal, LV_OBJ_FLAG_HIDDEN);
   hideSpoolFlowOverlays();
   hideMoreInfoOverlays();
+  hideLabelPrintOverlays();
   hideAmsViewOverlays();
   webPinScreenHide();
   hideLanguageScreen();

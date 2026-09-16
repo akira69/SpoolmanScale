@@ -94,6 +94,7 @@
 #include "ui/main_screen.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/more_info_screen.h"
+#include "ui/label_print_screen.h"
 #include "ui/navigation.h"
 #include "ui/ota_menu.h"
 #include "ui/scale_menu.h"
@@ -775,6 +776,7 @@ void appLoop() {
   // answer should see it in the same pass rather than the one after.
   handleStatusPickerDeferredActions();
   handleMoreInfoDeferredActions();
+  handleLabelPrintDeferredActions();
   handleAmsAssignDeferredActions();
   handleAmsViewDeferredActions();
   handleAmsDetailDeferredActions();

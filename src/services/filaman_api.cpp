@@ -91,6 +91,60 @@ static float roundGrams(float g) {
 // Defined further down, next to the other request helpers.
 static void addApiKey(HTTPClient& http, const char* api_key);
 
+#define FILAMAN_LABEL_PRESET_MAX  64
+#define FILAMAN_LABEL_PRESET_JSON_MAX  8192
+
+int filamanListLabelPresets(const char* base_url, const char* api_key,
+                            FilaManLabelPreset* out, size_t capacity, size_t* count,
+                            uint32_t timeout_ms) {
+  if (count) *count = 0;
+  if (!count || !out || capacity == 0 || capacity > FILAMAN_LABEL_PRESET_MAX ||
+      !hasBaseUrl(base_url) || !api_key || !api_key[0]) return -1;
+
+  HTTPClient http;
+  http.begin(String(base_url) + "/api/v1/labels/presets");
+  http.setTimeout(timeout_ms);
+  addApiKey(http, api_key);
+  const int code = http.GET();
+  if (code != 200) { http.end(); return code; }
+
+  const int declared = http.getSize();
+  if (declared > FILAMAN_LABEL_PRESET_JSON_MAX) { http.end(); return -2; }
+  char* body = (char*)malloc(FILAMAN_LABEL_PRESET_JSON_MAX + 1);
+  if (!body) { http.end(); return -2; }
+  size_t used = 0;
+  WiFiClient* stream = http.getStreamPtr();
+  while ((http.connected() || stream->available()) && used < FILAMAN_LABEL_PRESET_JSON_MAX) {
+    const size_t room = FILAMAN_LABEL_PRESET_JSON_MAX - used;
+    const size_t got = stream->readBytes(body + used, room);
+    if (!got) break;
+    used += got;
+  }
+  body[used] = '\0';
+  const bool oversized = (declared >= 0 && declared != (int)used) ||
+                         (declared < 0 && used == FILAMAN_LABEL_PRESET_JSON_MAX);
+  http.end();
+  if (oversized) { free(body); return -2; }
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body, used)) { free(body); return -2; }
+  free(body);
+  JsonArrayConst presets = doc.as<JsonArrayConst>();
+  if (presets.isNull() || presets.size() > capacity) return -3;
+  for (JsonVariantConst value : presets) {
+    JsonObjectConst preset = value.as<JsonObjectConst>();
+    const int id = preset["id"] | -1;
+    const char* name = preset["name"].as<const char*>();
+    if (preset.isNull() || id <= 0 || !name || !name[0] ||
+        strlen(name) >= sizeof(out[*count].name)) return -3;
+    out[*count].id = id;
+    strncpy(out[*count].name, name, sizeof(out[*count].name) - 1);
+    out[*count].name[sizeof(out[*count].name) - 1] = '\0';
+    ++*count;
+  }
+  return code;
+}
+
 // ------------------------------------------------------------
 //  LOCATION CACHE
 //
