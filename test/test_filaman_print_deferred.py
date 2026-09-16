@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Drive the production LVGL callbacks and deferred handler with a host UI shim."""
+import os
+import subprocess
+import tempfile
+from pathlib import Path
+
+root = Path(__file__).parents[1]
+with tempfile.TemporaryDirectory() as tmp:
+    tmp = Path(tmp)
+    def header(name, body):
+        path = tmp / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('#pragma once\n' + body)
+    header('Arduino.h', '#include <stddef.h>\n#include <stdint.h>\n')
+    header('lvgl.h', r'''
+#include <vector>
+struct lv_event_t {};
+using lv_event_cb_t = void (*)(lv_event_t*);
+struct lv_obj_t { int x=0, y=0; lv_event_cb_t cb=nullptr; };
+extern std::vector<lv_obj_t*> objects;
+inline lv_obj_t* lv_obj_create(lv_obj_t*) { auto* o=new lv_obj_t; objects.push_back(o); return o; }
+inline lv_obj_t* lv_btn_create(lv_obj_t* p) { return lv_obj_create(p); }
+inline lv_obj_t* lv_label_create(lv_obj_t* p) { return lv_obj_create(p); }
+inline lv_obj_t* lv_scr_act() { return nullptr; }
+inline void lv_obj_set_size(lv_obj_t*, int, int) {}
+inline void lv_obj_set_width(lv_obj_t*, int) {}
+inline void lv_obj_set_height(lv_obj_t*, int) {}
+inline void lv_obj_set_pos(lv_obj_t* o, int x, int y) { o->x=x; o->y=y; }
+inline void lv_obj_set_style_bg_color(lv_obj_t*, int, int) {}
+inline void lv_obj_set_style_radius(lv_obj_t*, int, int) {}
+inline void lv_obj_set_style_border_width(lv_obj_t*, int, int) {}
+inline void lv_obj_set_style_pad_all(lv_obj_t*, int, int) {}
+inline void lv_obj_set_style_pad_row(lv_obj_t*, int, int) {}
+inline void lv_obj_set_style_text_color(lv_obj_t*, int, int) {}
+inline void lv_obj_set_style_text_font(lv_obj_t*, const int*, int) {}
+inline void lv_obj_set_style_text_align(lv_obj_t*, int, int) {}
+inline void lv_obj_set_flex_flow(lv_obj_t*, int) {}
+inline void lv_obj_clear_flag(lv_obj_t*, int) {}
+inline void lv_obj_clean(lv_obj_t*) {}
+inline void lv_obj_center(lv_obj_t*) {}
+inline void lv_obj_align(lv_obj_t*, int, int, int) {}
+inline void lv_obj_add_event_cb(lv_obj_t* o, lv_event_cb_t cb, int, void*) { o->cb=cb; }
+inline void lv_label_set_text(lv_obj_t*, const char*) {}
+inline void lv_label_set_long_mode(lv_obj_t*, int) {}
+inline int lv_color_hex(int v) { return v; }
+static const int lv_font_montserrat_ext_20=0;
+#define LV_EVENT_CLICKED 1
+#define LV_OBJ_FLAG_SCROLLABLE 1
+#define LV_LABEL_LONG_DOT 1
+#define LV_ALIGN_TOP_MID 1
+#define LV_TEXT_ALIGN_CENTER 1
+#define LV_FLEX_FLOW_COLUMN 1
+#define LV_SYMBOL_LEFT "<"
+''')
+    header('services/filaman_api.h', '''#include <stddef.h>\n#include <stdint.h>\nstruct FilaManLabelPreset { int id; char name[64]; };\nint filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t*);\nint filamanRequestLabelPrint(const char*,const char*,int,int,int*,uint32_t=8000);\n''')
+    header('services/http_progress.h', 'struct HttpStallTime {};\n')
+    header('app/app_state.h', 'extern bool sm_found; extern int sm_id;\n')
+    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_LABEL_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_LABEL_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED };\ninline const char* T(int) { return "text"; }\n''')
+    header('services/backend.h', 'bool backendIsFilaMan(); const char* backendBaseUrl(); const char* filamanApiKey();\n')
+    header('services/prefs_store.h', 'int prefsGetInt(const char*,int); bool prefsPutInt(const char*,int);\n')
+    header('services/wifi_manager.h', 'bool wifiManagerIsConnected();\n')
+    header('ui/navigation.h', 'void hideAllOverlays();\n')
+    header('ui/more_info_screen.h', 'void showMoreInfoScreen();\n')
+    header('ui/label_preset_selection.h', '#include <lvgl.h>\nvoid labelPresetRowCb(lv_event_t*);\n')
+    header('ui/ui_common.h', '#include <lvgl.h>\nvoid releaseScreen(lv_obj_t**);\n')
+    source = r'''
+#include <assert.h>
+#include <vector>
+#include <lvgl.h>
+#include "ui/label_print_screen.h"
+#include "services/filaman_api.h"
+std::vector<lv_obj_t*> objects;
+bool sm_found=true; int sm_id=123;
+int preset=7, posts=0, sent_spool=0, sent_preset=0, closed=0;
+bool backendIsFilaMan() { return true; }
+const char* backendBaseUrl() { return "http://fila"; }
+const char* filamanApiKey() { return "uak.key"; }
+bool wifiManagerIsConnected() { return true; }
+int prefsGetInt(const char*,int) { return preset; }
+bool prefsPutInt(const char*,int v) { preset=v; return true; }
+int filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t* count) { *count=0; return 200; }
+int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return 201; }
+void hideAllOverlays() {}
+void releaseScreen(lv_obj_t** screen) { if (*screen) { ++closed; *screen=nullptr; } }
+void showMoreInfoScreen() {}
+void labelPresetRowCb(lv_event_t*) {}
+void tap(int x,int y) { for (auto* o: objects) if (o->x==x && o->y==y && o->cb) { lv_event_t e; o->cb(&e); return; } assert(false); }
+int main() {
+  requestLabelPresetScreen(123); handleLabelPrintDeferredActions();
+  tap(150,252); tap(150,252); preset=8;
+  tap(12,8); handleLabelPrintDeferredActions();
+  assert(posts==0 && closed==1);
+  requestLabelPresetScreen(123); handleLabelPrintDeferredActions();
+  preset=7; tap(150,252); tap(150,252); preset=8;
+  handleLabelPrintDeferredActions();
+  assert(posts==1 && sent_spool==123 && sent_preset==7);
+  tap(150,252); hideLabelPrintOverlays(); handleLabelPrintDeferredActions();
+  assert(posts==1 && closed==2);
+}
+'''
+    result = subprocess.run(['g++','-std=c++11',f'-I{tmp}',f'-I{root / "src"}', f'-I{root / "src/ui"}','-x','c++','-',os.environ.get('FILAMAN_LABEL_SCREEN_SOURCE', str(root/'src/ui/label_print_screen.cpp')),'-o',str(tmp/'check')],input=source,text=True,capture_output=True)
+    assert result.returncode == 0, result.stderr
+    result = subprocess.run([str(tmp/'check')],capture_output=True,text=True)
+    assert result.returncode == 0, result.stderr
