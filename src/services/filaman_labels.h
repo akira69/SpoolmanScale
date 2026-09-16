@@ -2,6 +2,9 @@
 
 #include "services/label_raster.h"
 
+// Local fetch error when the scale cannot allocate the raster in PSRAM.
+constexpr int FILAMAN_LABEL_NO_PSRAM = -3;
+
 int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_id,
                           int preset_id, uint16_t requested_width, LabelRaster* out,
                           uint32_t timeout_ms = 12000);

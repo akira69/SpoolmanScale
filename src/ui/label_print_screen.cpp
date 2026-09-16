@@ -262,6 +262,7 @@ void handleLabelPrintDeferredActions() {
         case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
         case 404: fetchPresets(); setStatus(T(STR_LABEL_PC_MISSING)); break;
         case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
+        case FILAMAN_LABEL_NO_PSRAM: setStatus(T(STR_LABEL_M220_NO_PSRAM)); break;
         default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_M220_FAILED : STR_LABEL_NO_WIFI)); break;
       }
     }
