@@ -11,12 +11,26 @@
 namespace {
 QueueHandle_t s_write_events = nullptr;
 QueueHandle_t s_disconnect_events = nullptr;
+QueueHandle_t s_connect_events = nullptr;
 esp_gatt_if_t s_gatt_if = ESP_GATT_IF_NONE;
+esp_gatt_if_t s_connect_gatt_if = ESP_GATT_IF_NONE;
 uint16_t s_conn_id = 0, s_write_handle = 0;
+uint16_t s_connect_app_id = 0;
 bool s_client_unresolved = false;
 
 void onGattEvent(esp_gattc_cb_event_t event, esp_gatt_if_t gatt_if,
                  esp_ble_gattc_cb_param_t* param) {
+  if (event == ESP_GATTC_REG_EVT && s_connect_events &&
+      param->reg.app_id == s_connect_app_id) {
+    s_connect_gatt_if = gatt_if;
+    uint8_t done = ESP_GATTC_REG_EVT;
+    xQueueSend(s_connect_events, &done, 0);
+  }
+  if (event == ESP_GATTC_OPEN_EVT && s_connect_events &&
+      gatt_if == s_connect_gatt_if) {
+    uint8_t done = ESP_GATTC_OPEN_EVT;
+    xQueueSend(s_connect_events, &done, 0);
+  }
   if (event == ESP_GATTC_WRITE_CHAR_EVT && s_write_events &&
       gatt_if == s_gatt_if && param->write.conn_id == s_conn_id &&
       param->write.handle == s_write_handle) {
@@ -33,6 +47,15 @@ void onGattEvent(esp_gattc_cb_event_t event, esp_gatt_if_t gatt_if,
 bool clientRegistered(BLEClient* client) {
   for (const auto& peer : BLEDevice::getPeerDevices(true))
     if (peer.second.peer_device == client) return true;
+  return false;
+}
+
+bool connectEventComplete(uint8_t expected) {
+  const uint32_t until = millis() + 3000;
+  uint8_t event;
+  while ((int32_t)(until - millis()) > 0)
+    if (xQueueReceive(s_connect_events, &event, pdMS_TO_TICKS(100)) == pdTRUE &&
+        event == expected) return true;
   return false;
 }
 }
@@ -65,15 +88,29 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
   BLEDevice::init("");
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
-  if (!s_disconnect_events) { delete client; return fail("M220 disconnect queue unavailable."); }
+  if (!s_connect_events) s_connect_events = xQueueCreate(2, sizeof(uint8_t));
+  if (!s_disconnect_events || !s_connect_events) { delete client; return fail("M220 BLE queue unavailable."); }
   xQueueReset(s_disconnect_events);
+  xQueueReset(s_connect_events);
   s_gatt_if = ESP_GATT_IF_NONE;
+  s_connect_gatt_if = ESP_GATT_IF_NONE;
+  s_connect_app_id = BLEDevice::m_appId;
   s_conn_id = 0;
   BLEDevice::setCustomGattcHandler(onGattEvent);
   bool ok = false;
   bool connected = false;
+  bool connect_completed = true;
   do {
-    if (!client->connect(BLEAddress(address))) { fail("Could not connect to M220."); break; }
+    if (!client->connect(BLEAddress(address))) {
+      // REG/OPEN give their semaphores before BLEDevice calls our hook.
+      // No event means the API failed synchronously and removed the peer.
+      const uint8_t last_event = client->getConnId() != ESP_GATT_IF_NONE
+          ? ESP_GATTC_OPEN_EVT : client->getGattcIf() != ESP_GATT_IF_NONE
+          ? ESP_GATTC_REG_EVT : 0;
+      connect_completed = !last_event || connectEventComplete(last_event);
+      fail("Could not connect to M220.");
+      break;
+    }
     connected = true;
     s_gatt_if = client->getGattcIf();
     s_conn_id = client->getConnId();
@@ -122,9 +159,9 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
       xQueueReceive(s_disconnect_events, &done, pdMS_TO_TICKS(3000)) == pdTRUE;
   const bool still_registered = clientRegistered(client);
   BLEDevice::setCustomGattcHandler(nullptr);
-  if (!disconnect_done || still_registered) {
+  if ((connected && !disconnect_done) || !connect_completed || still_registered) {
     // ponytail: retain one unresolved client and require restart; a late GATT
-    // callback could otherwise use freed memory. This includes failed connect.
+    // callback could otherwise use freed memory.
     s_client_unresolved = true;
     if (!connected) return false;
     return fail("M220 disconnect timed out. Restart scale before retrying.");

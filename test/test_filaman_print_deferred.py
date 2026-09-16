@@ -106,11 +106,17 @@ int main() {
   assert(default_row && default_row->bg==0x102035);
   lv_event_t select; select.user_data=nullptr; default_row->cb(&select);
   assert(preset==0 && default_row->bg==0x102035);
+  size_t before_refresh=objects.size();
   handleLabelPrintDeferredActions();
   assert(default_row->bg==0x102035);
-  bool refreshed=false;
-  for (auto* o: objects) if (o->width==392 && o->bg==0x174f46) refreshed=true;
-  assert(refreshed);
+  bool new_default=false, new_saved=false;
+  for (size_t i=before_refresh;i<objects.size();++i) {
+    auto* o=objects[i];
+    if (o->width!=392 || !o->cb) continue;
+    if (o->user_data==nullptr && o->bg==0x174f46) new_default=true;
+    if (o->user_data==(void*)7 && o->bg==0x102035) new_saved=true;
+  }
+  assert(new_default && new_saved);
   preset=7;
   tap(45,252); tap(45,252); preset=8;
   tap(12,8); handleLabelPrintDeferredActions();
