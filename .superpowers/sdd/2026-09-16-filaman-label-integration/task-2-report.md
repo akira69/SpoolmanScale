@@ -32,3 +32,12 @@
 - GREEN: `python3 test/test_filaman_print_flow.py`, `python3 test/test_filaman_print_request.py`, and `python3 test/test_filaman_label_presets.py` each exited 0.
 - Firmware: `PLATFORMIO_CORE_DIR=/tmp/filaman-scale-platformio-core PLATFORMIO_SETTING_ENABLE_TELEMETRY=no pio run -e wt32-sc01-plus` exited 0, `[SUCCESS] Took 9.15 seconds`.
 - Deferred UI and physical double tap remain unverified on hardware. The host test covers the shared state behavior, while Back and overlay call sites were reviewed directly.
+
+## Deferred handler regression check
+
+A host UI shim now drives the **production** `label_print_screen.cpp` callbacks and `handleLabelPrintDeferredActions()`. It verifies that Back and Print in one pass close the screen without a POST, a normal double tap produces one POST with the preset ID frozen at the tap, and hiding overlays cancels a pending request. The shim replaces only LVGL, network, storage, and navigation dependencies.
+
+- RED: `git show e2e3c6d:src/ui/label_print_screen.cpp > /tmp/filaman-old-label-screen.cpp` then `FILAMAN_LABEL_SCREEN_SOURCE=/tmp/filaman-old-label-screen.cpp python3 test/test_filaman_print_deferred.py` failed at runtime: `Assertion failed: (posts==0 && closed==1)`.
+- GREEN: `python3 test/test_filaman_print_deferred.py` exited 0 against the current production handler.
+- Focused checks: `python3 test/test_filaman_print_flow.py`, `python3 test/test_filaman_print_request.py`, and `python3 test/test_filaman_label_presets.py` all exited 0.
+- Firmware: `PLATFORMIO_CORE_DIR=/tmp/filaman-scale-platformio-core PLATFORMIO_SETTING_ENABLE_TELEMETRY=no pio run -e wt32-sc01-plus` exited 0, `[SUCCESS] Took 4.38 seconds`.
