@@ -4,8 +4,25 @@
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <esp_gattc_api.h>
+#include <freertos/queue.h>
 #include <cstdio>
 #include <cstring>
+
+namespace {
+QueueHandle_t s_write_events = nullptr;
+esp_gatt_if_t s_gatt_if = ESP_GATT_IF_NONE;
+uint16_t s_conn_id = 0, s_write_handle = 0;
+
+void onGattEvent(esp_gattc_cb_event_t event, esp_gatt_if_t gatt_if,
+                 esp_ble_gattc_cb_param_t* param) {
+  if (event == ESP_GATTC_WRITE_CHAR_EVT && s_write_events &&
+      gatt_if == s_gatt_if && param->write.conn_id == s_conn_id &&
+      param->write.handle == s_write_handle) {
+    esp_gatt_status_t status = param->write.status;
+    xQueueSend(s_write_events, &status, 0);
+  }
+}
+}
 
 size_t phomemoM220Scan(M220Device* out, size_t capacity) {
   BLEDevice::init("");
@@ -41,17 +58,27 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     if (!write || (!write->canWrite() && !write->canWriteNoResponse())) {
       fail("M220 write characteristic missing."); break;
     }
+    if (!s_write_events) s_write_events = xQueueCreate(1, sizeof(esp_gatt_status_t));
+    if (!s_write_events) { fail("M220 write queue unavailable."); break; }
+    s_gatt_if = client->getGattcIf();
+    s_conn_id = client->getConnId();
+    s_write_handle = write->getHandle();
+    BLEDevice::setCustomGattcHandler(onGattEvent);
     const size_t chunk = m220WriteChunk(client->getMTU());
     const bool response = write->canWrite();
     auto send = [&](const uint8_t* data, size_t length) {
       for (size_t pos = 0; pos < length; pos += chunk) {
         if (!client->isConnected()) return false;
+        xQueueReset(s_write_events);
         esp_err_t result = esp_ble_gattc_write_char(
             client->getGattcIf(), client->getConnId(), write->getHandle(),
             min(chunk, length - pos), const_cast<uint8_t*>(data + pos),
             response ? ESP_GATT_WRITE_TYPE_RSP : ESP_GATT_WRITE_TYPE_NO_RSP,
             ESP_GATT_AUTH_REQ_NONE);
         if (result != ESP_OK) return false;
+        esp_gatt_status_t status;
+        if (xQueueReceive(s_write_events, &status, pdMS_TO_TICKS(3000)) != pdTRUE ||
+            status != ESP_GATT_OK) return false;
         if (!client->isConnected()) return false;
         delay(20);
       }
@@ -66,6 +93,7 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
         !send(feed, sizeof(feed))) { fail("M220 write failed or disconnected."); break; }
     ok = true;
   } while (false);
+  BLEDevice::setCustomGattcHandler(nullptr);
   if (client->isConnected()) client->disconnect();
   delete client;
   return ok;
