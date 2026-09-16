@@ -18,4 +18,10 @@ int main() {
   assert(labelRasterPaddingValid(image));
   row[48] = 0x81;
   assert(!labelRasterPaddingValid(image));
+  uint8_t rotated_rows[96] = {};
+  LabelRaster rotated{384, 2, 48, rotated_rows, sizeof(rotated_rows), 3, true};
+  // A 2x3 portrait preview maps back from the right-aligned, rotated print rows.
+  rotated_rows[48 + 47] = 0x04;
+  assert(labelRasterPreviewBlack(rotated, 0, 0));
+  assert(!labelRasterPreviewBlack(rotated, 1, 0));
 }

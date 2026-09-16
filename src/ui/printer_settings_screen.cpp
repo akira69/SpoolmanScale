@@ -11,6 +11,7 @@
 #include "services/prefs_store.h"
 #include "ui/connection_screen.h"
 #include "ui/header_status.h"
+#include "ui/label_print_screen.h"
 #include "ui/navigation.h"
 #include "ui/ui_common.h"
 
@@ -51,23 +52,34 @@ void buildScreen() {
   screen = buildOverlayScreen();
   buildSubHeader(screen, T(STR_PRINTER_TITLE), [](lv_event_t*) { back_pending = true; });
 
+  lv_obj_t* preset = lv_btn_create(screen);
+  lv_obj_set_size(preset, 112, 34);
+  lv_obj_set_pos(preset, 352, 8);
+  styleOutlineButton(preset);
+  lv_obj_add_event_cb(preset, [](lv_event_t*) { requestLabelPresetSettingsScreen(); }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* preset_text = lv_label_create(preset);
+  lv_label_set_text(preset_text, T(STR_LABEL_PRESET_TITLE));
+  lv_obj_center(preset_text);
+
   lv_obj_t* scan = lv_btn_create(screen);
   lv_obj_set_size(scan, 210, 38);
   lv_obj_set_pos(scan, 20, 56);
+  styleOutlineButton(scan);
   lv_obj_add_event_cb(scan, [](lv_event_t*) { scan_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* scan_text = lv_label_create(scan);
-  lv_label_set_text(scan_text, T(STR_LABEL_M220_SCAN));
+  lv_label_set_text_fmt(scan_text, "%s  %s", LV_SYMBOL_GPS, T(STR_LABEL_M220_SCAN));
   lv_obj_center(scan_text);
 
   lv_obj_t* clear = lv_btn_create(screen);
   lv_obj_set_size(clear, 210, 38);
   lv_obj_set_pos(clear, 250, 56);
+  styleOutlineButton(clear);
   lv_obj_add_event_cb(clear, [](lv_event_t*) {
     prefsPutString("m220_addr", "");
     updateSavedAddress();
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* clear_text = lv_label_create(clear);
-  lv_label_set_text(clear_text, T(STR_PRINTER_CLEAR));
+  lv_label_set_text_fmt(clear_text, "%s  %s", LV_SYMBOL_TRASH, T(STR_PRINTER_CLEAR));
   lv_obj_center(clear_text);
 
   status = lv_label_create(screen);
@@ -84,10 +96,11 @@ void buildScreen() {
   lv_obj_set_style_bg_color(list, lv_color_hex(0x0a1020), 0);
 
   int saved = prefsGetInt("m220_width", 576);
-  width = saved >= 384 && saved <= 1024 && saved % 8 == 0 ? saved : 576;
+  width = saved >= 384 && saved <= 576 && saved % 8 == 0 ? saved : 576;
   lv_obj_t* minus = lv_btn_create(screen);
   lv_obj_set_size(minus, 60, 38);
   lv_obj_set_pos(minus, 110, 266);
+  styleOutlineButton(minus);
   lv_obj_add_event_cb(minus, [](lv_event_t*) {
     if (width > 384) { width -= 8; prefsPutInt("m220_width", width); updateWidth(); }
   }, LV_EVENT_CLICKED, nullptr);
@@ -103,8 +116,9 @@ void buildScreen() {
   lv_obj_t* plus = lv_btn_create(screen);
   lv_obj_set_size(plus, 60, 38);
   lv_obj_set_pos(plus, 310, 266);
+  styleOutlineButton(plus);
   lv_obj_add_event_cb(plus, [](lv_event_t*) {
-    if (width < 1024) { width += 8; prefsPutInt("m220_width", width); updateWidth(); }
+    if (width < 576) { width += 8; prefsPutInt("m220_width", width); updateWidth(); }
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* plus_text = lv_label_create(plus);
   lv_label_set_text(plus_text, "+"); lv_obj_center(plus_text);
@@ -129,11 +143,13 @@ void handlePrinterSettingsDeferredActions() {
   if (scan_pending && screen) {
     scan_pending = false;
     setStatus(T(STR_PRINTER_SCANNING));
+    lv_refr_now(nullptr);
     size_t count = phomemoM220Scan(devices, 8);
     lv_obj_clean(list);
     for (size_t i = 0; i < count && lvPoolHasRoomForRow(); ++i) {
       lv_obj_t* row = lv_btn_create(list);
       lv_obj_set_size(row, 420, 42);
+      styleOutlineButton(row);
       lv_obj_add_event_cb(row, [](lv_event_t* e) {
         const char* address = static_cast<const char*>(lv_event_get_user_data(e));
         prefsPutString("m220_addr", address);

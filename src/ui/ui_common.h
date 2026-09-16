@@ -3,6 +3,7 @@
 #include <lvgl.h>
 
 void addBackButton(lv_obj_t *parent, lv_event_cb_t cb);
+void styleOutlineButton(lv_obj_t *button);
 // The "?" circle in the header row, between the centred title and the close
 // button - the one gap on a sub screen nothing else wants. Opens the info
 // popup with the two strings.

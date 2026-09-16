@@ -41,14 +41,14 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
 
   HttpStallTime stall;
   String url = String(base_url) + "/api/v1/labels/spool/" + spool_id +
-               "/render?format=mono1&width=" + requested_width;
+               "/render?format=mono1&dpi=203&align=right&orientation=landscape&width=" + requested_width;
   if (preset_id) url += String("&preset_id=") + preset_id;
   HTTPClient http;
   if (!http.begin(url)) return -1;
   http.setTimeout(timeout_ms);
   http.setReuse(false);
-  const char* headers[] = {"X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order"};
-  http.collectHeaders(headers, 4);
+  const char* headers[] = {"X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated"};
+  http.collectHeaders(headers, 6);
   addApiKey(http, api_key);
   const int code = http.GET();
   if (code != 200) { http.end(); return code; }
@@ -57,10 +57,14 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
   const bool headers_ok = parseHeaderNumber(http.header("X-Image-Width"), &image.width) &&
                           parseHeaderNumber(http.header("X-Image-Height"), &image.height) &&
                           parseHeaderNumber(http.header("X-Row-Bytes"), &image.row_bytes) &&
+                          parseHeaderNumber(http.header("X-Content-Width"), &image.content_width) &&
+                          (http.header("X-Rotated") == "0" || http.header("X-Rotated") == "1") &&
                           http.header("X-Bit-Order") == "msb-black-1";
+  image.rotated = http.header("X-Rotated") == "1";
   const int declared = http.getSize();
   image.length = declared > 0 ? size_t(declared) : 0;
-  if (!headers_ok || image.width != requested_width ||
+  if (!headers_ok || image.width != requested_width || !image.content_width ||
+      image.content_width > image.width ||
       !labelRasterShapeValid(image.width, image.height, image.row_bytes, image.length)) {
     http.end();
     return -2;

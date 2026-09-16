@@ -1,6 +1,7 @@
 #pragma once
 
-void requestLabelPresetScreen(int spool_id);
+void requestLabelPreviewScreen(int spool_id);
+void requestLabelPresetSettingsScreen();
 void handleLabelPrintDeferredActions();
 void hideLabelPrintOverlays();
 void requestLabelPresetRefresh();

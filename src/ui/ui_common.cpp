@@ -35,6 +35,15 @@ bool uiModalWaiting() {
       || isAmsAssignPopupOpen();
 }
 
+void styleOutlineButton(lv_obj_t *button) {
+  lv_obj_set_style_bg_color(button, lv_color_hex(0x0a1828), 0);
+  lv_obj_set_style_bg_color(button, lv_color_hex(0x1a3050), LV_STATE_PRESSED);
+  lv_obj_set_style_border_color(button, lv_color_hex(0x28d49a), 0);
+  lv_obj_set_style_border_width(button, 1, 0);
+  lv_obj_set_style_radius(button, 8, 0);
+  lv_obj_set_style_shadow_width(button, 0, 0);
+}
+
 lv_color_t swatchColorFromHex(const char* hex) {
   if (!hex) return lv_color_hex(SWATCH_FALLBACK_COLOR);
   const char* h = (hex[0] == '#') ? hex + 1 : hex;
