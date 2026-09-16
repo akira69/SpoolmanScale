@@ -10,10 +10,6 @@ struct FilaManLabelPreset {
   char name[64];
 };
 
-inline int filamanLabelPresetId(void* user_data) {
-  return (int)(intptr_t)user_data;
-}
-
 inline int filamanParseLabelPresets(const char* json, FilaManLabelPreset* out,
                                     size_t capacity, size_t* count) {
   if (count) *count = 0;
