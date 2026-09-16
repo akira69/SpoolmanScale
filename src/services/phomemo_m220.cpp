@@ -10,8 +10,10 @@
 
 namespace {
 QueueHandle_t s_write_events = nullptr;
+QueueHandle_t s_disconnect_events = nullptr;
 esp_gatt_if_t s_gatt_if = ESP_GATT_IF_NONE;
 uint16_t s_conn_id = 0, s_write_handle = 0;
+bool s_client_unresolved = false;
 
 void onGattEvent(esp_gattc_cb_event_t event, esp_gatt_if_t gatt_if,
                  esp_ble_gattc_cb_param_t* param) {
@@ -21,6 +23,17 @@ void onGattEvent(esp_gattc_cb_event_t event, esp_gatt_if_t gatt_if,
     esp_gatt_status_t status = param->write.status;
     xQueueSend(s_write_events, &status, 0);
   }
+  if (event == ESP_GATTC_DISCONNECT_EVT && s_disconnect_events &&
+      gatt_if == s_gatt_if && param->disconnect.conn_id == s_conn_id) {
+    uint8_t done = 1;
+    xQueueSend(s_disconnect_events, &done, 0);
+  }
+}
+
+bool clientRegistered(BLEClient* client) {
+  for (const auto& peer : BLEDevice::getPeerDevices(true))
+    if (peer.second.peer_device == client) return true;
+  return false;
 }
 }
 
@@ -44,15 +57,26 @@ size_t phomemoM220Scan(M220Device* out, size_t capacity) {
 
 bool phomemoM220Print(const char* address, const LabelRaster& image,
                      char* error, size_t error_size) {
-  auto fail = [&](const char* message) { snprintf(error, error_size, "%s", message); return false; };
+  auto fail = [&](const char* message) { if (error_size) snprintf(error, error_size, "%s", message); return false; };
   if (error_size) error[0] = 0;
   if (!address || !*address) return fail("Select an M220 printer first.");
   if (!labelRasterPaddingValid(image)) return fail("Invalid label image.");
+  if (s_client_unresolved) return fail("M220 BLE cleanup pending. Restart scale before retrying.");
   BLEDevice::init("");
   BLEClient* client = BLEDevice::createClient();
+  if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
+  if (!s_disconnect_events) { delete client; return fail("M220 disconnect queue unavailable."); }
+  xQueueReset(s_disconnect_events);
+  s_gatt_if = ESP_GATT_IF_NONE;
+  s_conn_id = 0;
+  BLEDevice::setCustomGattcHandler(onGattEvent);
   bool ok = false;
+  bool connected = false;
   do {
     if (!client->connect(BLEAddress(address))) { fail("Could not connect to M220."); break; }
+    connected = true;
+    s_gatt_if = client->getGattcIf();
+    s_conn_id = client->getConnId();
     BLERemoteService* service = client->getService(BLEUUID((uint16_t)0xff00));
     BLERemoteCharacteristic* write = service ? service->getCharacteristic(BLEUUID((uint16_t)0xff02)) : nullptr;
     if (!write || (!write->canWrite() && !write->canWriteNoResponse())) {
@@ -60,10 +84,7 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     }
     if (!s_write_events) s_write_events = xQueueCreate(1, sizeof(esp_gatt_status_t));
     if (!s_write_events) { fail("M220 write queue unavailable."); break; }
-    s_gatt_if = client->getGattcIf();
-    s_conn_id = client->getConnId();
     s_write_handle = write->getHandle();
-    BLEDevice::setCustomGattcHandler(onGattEvent);
     const size_t chunk = m220WriteChunk(client->getMTU());
     const bool response = write->canWrite();
     auto send = [&](const uint8_t* data, size_t length) {
@@ -93,8 +114,21 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
         !send(feed, sizeof(feed))) { fail("M220 write failed or disconnected."); break; }
     ok = true;
   } while (false);
-  BLEDevice::setCustomGattcHandler(nullptr);
   if (client->isConnected()) client->disconnect();
+  uint8_t done = 0;
+  // The library removes the peer before its event handler returns. Our hook
+  // runs after that handler, so only this signal permits deleting the client.
+  const bool disconnect_done = connected &&
+      xQueueReceive(s_disconnect_events, &done, pdMS_TO_TICKS(3000)) == pdTRUE;
+  const bool still_registered = clientRegistered(client);
+  BLEDevice::setCustomGattcHandler(nullptr);
+  if (!disconnect_done || still_registered) {
+    // ponytail: retain one unresolved client and require restart; a late GATT
+    // callback could otherwise use freed memory. This includes failed connect.
+    s_client_unresolved = true;
+    if (!connected) return false;
+    return fail("M220 disconnect timed out. Restart scale before retrying.");
+  }
   delete client;
   return ok;
 }

@@ -40,12 +40,15 @@ static inline void* lv_obj_get_user_data(lv_obj_t* obj) { return obj->user_data;
 #include <assert.h>
 #include "ui/label_preset_selection.h"
 static int stored = 0;
+static int refreshes = 0;
 bool prefsPutInt(const char*, int id) { stored = id; return true; }
+void requestLabelPresetRefresh() { ++refreshes; }
 int main() {
   lv_obj_t target = {(void*)99};
   lv_event_t event = {(void*)7, &target};
   labelPresetRowCb(&event);
   assert(stored == 7);
+  assert(refreshes == 1);
 }
 '''
     result = subprocess.run(
