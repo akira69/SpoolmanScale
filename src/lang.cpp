@@ -849,6 +849,14 @@ const char* const STRINGS[][3] = {
   { "Spule oder Vorlage aktualisieren und erneut wählen.", "Refresh the spool or preset and select again." }, // STR_LABEL_PC_MISSING
   { "Spule oder Vorlage prüfen und korrigieren.", "Check and correct the spool or preset." }, // STR_LABEL_PC_INVALID
   { "Anfrage fehlgeschlagen. Im FilaMan-Tab prüfen, bevor erneut gesendet wird.", "Request failed. Check the FilaMan tab before sending again." }, // STR_LABEL_PC_FAILED
+  { "M220 suchen", "Scan M220" }, // STR_LABEL_M220_SCAN
+  { "Auf M220 drucken", "Print on M220" }, // STR_LABEL_M220_PRINT
+  { "Kein M220 gefunden", "No M220 found" }, // STR_LABEL_M220_NONE
+  { "M220 auswählen", "Select an M220" }, // STR_LABEL_M220_SELECT
+  { "Label wird geladen...", "Fetching label..." }, // STR_LABEL_M220_FETCH
+  { "Sende an M220...", "Sending to M220..." }, // STR_LABEL_M220_SEND
+  { "An Drucker gesendet", "Sent to printer" }, // STR_LABEL_M220_SENT
+  { "Label konnte nicht geladen werden", "Could not fetch label" }, // STR_LABEL_M220_FAILED
   { "Ortsabfrage bei Entnahme", "Location on removal",
     "Demander l'emplacement au retrait" },  // STR_BTN_AUTO_LOC_POPUP
   { "Trocknungserinnerung",     "Drying Reminder",     "Rappel de séchage" },  // STR_BTN_DRYING_REMINDER
