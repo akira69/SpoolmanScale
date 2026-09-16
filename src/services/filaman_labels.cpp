@@ -66,7 +66,7 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
     return -2;
   }
   image.pixels = static_cast<uint8_t*>(heap_caps_malloc(image.length, MALLOC_CAP_SPIRAM));
-  if (!image.pixels) { http.end(); return -2; }
+  if (!image.pixels) { http.end(); return FILAMAN_LABEL_NO_PSRAM; }
   WiFiClient* stream = http.getStreamPtr();
   size_t used = 0;
   while (used < image.length) {

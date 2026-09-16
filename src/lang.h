@@ -475,6 +475,7 @@ enum StringID {
   STR_LABEL_M220_SEND,
   STR_LABEL_M220_SENT,
   STR_LABEL_M220_FAILED,
+  STR_LABEL_M220_NO_PSRAM,
 
   // No spools hint (link flow)
 

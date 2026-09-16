@@ -857,6 +857,7 @@ const char* const STRINGS[][3] = {
   { "Sende an M220...", "Sending to M220..." }, // STR_LABEL_M220_SEND
   { "An Drucker gesendet", "Sent to printer" }, // STR_LABEL_M220_SENT
   { "Label konnte nicht geladen werden", "Could not fetch label" }, // STR_LABEL_M220_FAILED
+  { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration." }, // STR_LABEL_M220_NO_PSRAM
   { "Ortsabfrage bei Entnahme", "Location on removal",
     "Demander l'emplacement au retrait" },  // STR_BTN_AUTO_LOC_POPUP
   { "Trocknungserinnerung",     "Drying Reminder",     "Rappel de séchage" },  // STR_BTN_DRYING_REMINDER

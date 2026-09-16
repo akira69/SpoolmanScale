@@ -58,7 +58,7 @@ static const int lv_font_montserrat_ext_20=0;
     header('services/filaman_api.h', '''#include <stddef.h>\n#include <stdint.h>\nstruct FilaManLabelPreset { int id; char name[64]; };\nint filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t*);\nint filamanRequestLabelPrint(const char*,const char*,int,int,int*,uint32_t=8000);\n''')
     header('services/http_progress.h', 'struct HttpStallTime {};\n')
     header('app/app_state.h', 'extern bool sm_found; extern int sm_id;\n')
-    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_LABEL_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_LABEL_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED, STR_LABEL_M220_SCAN, STR_LABEL_M220_PRINT, STR_LABEL_M220_NONE, STR_LABEL_M220_SELECT, STR_LABEL_M220_FETCH, STR_LABEL_M220_SEND, STR_LABEL_M220_SENT, STR_LABEL_M220_FAILED };\ninline const char* T(int) { return "text"; }\n''')
+    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_LABEL_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_LABEL_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED, STR_LABEL_M220_SCAN, STR_LABEL_M220_PRINT, STR_LABEL_M220_NONE, STR_LABEL_M220_SELECT, STR_LABEL_M220_FETCH, STR_LABEL_M220_SEND, STR_LABEL_M220_SENT, STR_LABEL_M220_FAILED, STR_LABEL_M220_NO_PSRAM };\nextern int status_id; inline const char* T(int id) { status_id=id; return "text"; }\n''')
     header('services/backend.h', 'bool backendIsFilaMan(); const char* backendBaseUrl(); const char* filamanApiKey();\n')
     header('services/prefs_store.h', 'int prefsGetInt(const char*,int); bool prefsPutInt(const char*,int); String prefsGetString(const char*); bool prefsPutString(const char*,const char*);\n')
     header('services/wifi_manager.h', 'bool wifiManagerIsConnected();\n')
@@ -69,6 +69,7 @@ static const int lv_font_montserrat_ext_20=0;
     source = r'''
 #include <assert.h>
 #include <Arduino.h>
+#include <lang.h>
 #include <vector>
 #include <lvgl.h>
 #include "ui/label_print_screen.h"
@@ -77,18 +78,20 @@ static const int lv_font_montserrat_ext_20=0;
 #include "services/phomemo_m220.h"
 std::vector<lv_obj_t*> objects;
 bool sm_found=true; int sm_id=123;
-int preset=7, posts=0, sent_spool=0, sent_preset=0, closed=0;
+int preset=7, posts=0, sent_spool=0, sent_preset=0, closed=0, status_id=0;
+int response=201, fetch_response=-1, preset_fetches=0;
+bool wifi=true;
 bool backendIsFilaMan() { return true; }
 const char* backendBaseUrl() { return "http://fila"; }
 const char* filamanApiKey() { return "uak.key"; }
-bool wifiManagerIsConnected() { return true; }
+bool wifiManagerIsConnected() { return wifi; }
 int prefsGetInt(const char*,int) { return preset; }
 bool prefsPutInt(const char*,int v) { preset=v; return true; }
-String prefsGetString(const char*) { return String(""); }
+String prefsGetString(const char*) { return String("aa:bb:cc:dd:ee:ff"); }
 bool prefsPutString(const char*,const char*) { return true; }
-int filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t* count) { *count=0; return 200; }
-int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return 201; }
-int filamanFetchMonoLabel(const char*,const char*,int,int,uint16_t,LabelRaster*,uint32_t) { return -1; }
+int filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t* count) { ++preset_fetches; *count=0; return 200; }
+int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return response; }
+int filamanFetchMonoLabel(const char*,const char*,int,int,uint16_t,LabelRaster*,uint32_t) { return fetch_response; }
 void filamanFreeLabel(LabelRaster*) {}
 size_t phomemoM220Scan(M220Device*,size_t) { return 0; }
 bool phomemoM220Print(const char*,const LabelRaster&,char*,size_t) { return false; }
@@ -108,6 +111,20 @@ int main() {
   assert(posts==1 && sent_spool==123 && sent_preset==7);
   tap(45,252); hideLabelPrintOverlays(); handleLabelPrintDeferredActions();
   assert(posts==1 && closed==2);
+  requestLabelPresetScreen(123); handleLabelPrintDeferredActions();
+  wifi=false; tap(45,252); handleLabelPrintDeferredActions();
+  assert(status_id==STR_LABEL_NO_WIFI && posts==1);
+  wifi=true;
+  const int codes[]={401,403,404,422};
+  const int statuses[]={STR_LABEL_PC_KEY,STR_LABEL_PC_SCOPE,STR_LABEL_PC_MISSING,STR_LABEL_PC_INVALID};
+  for (int i=0;i<4;++i) {
+    response=codes[i]; int before=preset_fetches;
+    tap(45,252); handleLabelPrintDeferredActions();
+    assert(status_id==statuses[i]);
+    if (codes[i]==404) assert(preset_fetches==before+1);
+  }
+  fetch_response=-3; tap(255,252); handleLabelPrintDeferredActions();
+  assert(status_id==STR_LABEL_M220_NO_PSRAM);
 }
 '''
     result = subprocess.run(['g++','-std=c++11',f'-I{tmp}',f'-I{root / "src"}', f'-I{root / "src/ui"}','-x','c++','-',os.environ.get('FILAMAN_LABEL_SCREEN_SOURCE', str(root/'src/ui/label_print_screen.cpp')),'-o',str(tmp/'check')],input=source,text=True,capture_output=True)
