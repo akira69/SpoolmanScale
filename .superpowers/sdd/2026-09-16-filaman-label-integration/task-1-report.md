@@ -50,3 +50,25 @@ PLATFORMIO_SETTING_ENABLE_TELEMETRY=no pio run -e wt32-sc01-plus
 ```
 
 The host check compiles and runs the production preset parser. It verifies a nonzero selected ID remains `7`, and a later invalid preset rejects the list with `count == 0`.
+
+## Callback test fix
+
+The focused test now compiles and invokes the production `labelPresetRowCb()` with event data `7` and separate object data `99`; `prefsPutInt()` receives `7`. Reverting the callback to target-object user data makes that assertion fail.
+
+RED command and output:
+
+```text
+python3 test/test_filaman_label_presets.py
+# clang++: error: no such file or directory: src/ui/label_preset_selection.cpp
+```
+
+GREEN command and output:
+
+```text
+python3 test/test_filaman_label_presets.py
+# exit 0
+
+PLATFORMIO_CORE_DIR=/tmp/filaman-scale-platformio-core \
+PLATFORMIO_SETTING_ENABLE_TELEMETRY=no pio run -e wt32-sc01-plus
+# SUCCESS; RAM 196416 / 327680, Flash 2164569 / 3145728
+```
