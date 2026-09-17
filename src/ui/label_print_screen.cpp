@@ -14,6 +14,7 @@
 #include "services/prefs_store.h"
 #include "services/wifi_manager.h"
 #include "ui/label_preset_selection.h"
+#include "ui/label_preset_group.h"
 #include "ui/more_info_screen.h"
 #include "ui/navigation.h"
 #include "ui/printer_settings_screen.h"
@@ -21,7 +22,9 @@
 #include "lang.h"
 
 namespace {
-constexpr size_t kPresetCapacity = 64;
+constexpr size_t kPresetCapacity = 100;
+constexpr size_t kPresetsPerPage = 8;
+constexpr const char* kPresetGroups[] = {"A-F", "G-L", "M-R", "S-Z", "#"};
 lv_obj_t* screen = nullptr;
 lv_obj_t* list = nullptr;
 lv_obj_t* status = nullptr;
@@ -34,6 +37,8 @@ FilaManPrintPending pc_request;
 int spool_id = 0;
 bool preset_page = false;
 bool preset_from_preview = false;
+int preset_group = -1;
+size_t preset_page_index = 0;
 bool open_pending = false;
 bool settings_pending = false;
 bool change_pending = false;
@@ -58,7 +63,8 @@ void addPresetRow(int id, const char* name) {
   lv_obj_set_style_radius(row, 6, 0);
   lv_obj_add_event_cb(row, labelPresetRowCb, LV_EVENT_CLICKED, (void*)(intptr_t)id);
   lv_obj_t* label = lv_label_create(row);
-  lv_label_set_text(label, name);
+  if (id) lv_label_set_text_fmt(label, "#%d  %s", id, name);
+  else lv_label_set_text(label, name);
   lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
   lv_obj_set_width(label, 360);
   lv_obj_center(label);
@@ -67,8 +73,64 @@ void addPresetRow(int id, const char* name) {
 void fillPresetList() {
   if (!list) return;
   lv_obj_clean(list);
-  addPresetRow(0, T(STR_LABEL_DEFAULT));
-  for (size_t i = 0; i < preset_count; ++i) addPresetRow(presets[i].id, presets[i].name);
+  if (!labelPresetsUseGroups(preset_count)) {
+    preset_group = -1;
+    addPresetRow(0, T(STR_LABEL_DEFAULT));
+    for (size_t i = 0; i < preset_count; ++i) addPresetRow(presets[i].id, presets[i].name);
+    return;
+  }
+  if (preset_group < 0) {
+    addPresetRow(0, T(STR_LABEL_DEFAULT));
+    for (int group = 0; group < 5; ++group) {
+      size_t count = 0;
+      for (size_t i = 0; i < preset_count; ++i)
+        if (labelPresetGroup(presets[i].name) == group) ++count;
+      if (!count || !lvPoolHasRoomForRow()) continue;
+      lv_obj_t* row = lv_btn_create(list);
+      lv_obj_set_size(row, 392, 42);
+      lv_obj_set_style_bg_color(row, lv_color_hex(0x102035), 0);
+      lv_obj_set_style_radius(row, 6, 0);
+      lv_obj_add_event_cb(row, [](lv_event_t* e) {
+        preset_group = (int)(intptr_t)lv_event_get_user_data(e);
+        preset_page_index = 0;
+        requestLabelPresetRefresh();
+      }, LV_EVENT_CLICKED, (void*)(intptr_t)group);
+      lv_obj_t* label = lv_label_create(row);
+      lv_label_set_text_fmt(label, "%s  (%u)", kPresetGroups[group], (unsigned)count);
+      lv_obj_center(label);
+    }
+  } else {
+    size_t matching = 0;
+    for (size_t i = 0; i < preset_count; ++i)
+      if (labelPresetGroup(presets[i].name) == preset_group) ++matching;
+    const size_t pages = (matching + kPresetsPerPage - 1) / kPresetsPerPage;
+    if (pages && preset_page_index >= pages) preset_page_index = pages - 1;
+    auto addPageButton = [pages](int direction) {
+      if (!lvPoolHasRoomForRow()) return;
+      lv_obj_t* row = lv_btn_create(list);
+      lv_obj_set_size(row, 392, 42);
+      styleOutlineButton(row);
+      lv_obj_add_event_cb(row, [](lv_event_t* e) {
+        if ((intptr_t)lv_event_get_user_data(e) < 0) --preset_page_index;
+        else ++preset_page_index;
+        requestLabelPresetRefresh();
+      }, LV_EVENT_CLICKED, (void*)(intptr_t)direction);
+      lv_obj_t* label = lv_label_create(row);
+      lv_label_set_text_fmt(label, "%s %u/%u", direction < 0 ? "<" : ">",
+                            (unsigned)(preset_page_index + 1), (unsigned)pages);
+      lv_obj_center(label);
+    };
+    if (preset_page_index) addPageButton(-1);
+    if (preset_page_index + 1 < pages) addPageButton(1);
+    size_t position = 0;
+    for (size_t i = 0; i < preset_count; ++i) {
+      if (labelPresetGroup(presets[i].name) != preset_group) continue;
+      if (position >= preset_page_index * kPresetsPerPage &&
+          position < (preset_page_index + 1) * kPresetsPerPage)
+        addPresetRow(presets[i].id, presets[i].name);
+      ++position;
+    }
+  }
 }
 
 void fetchPresets() {
@@ -105,6 +167,8 @@ void buildPresetScreen() {
   filamanFreeLabel(&preview);
   list = status = pc_button = printer_button = nullptr;
   preset_page = true;
+  preset_group = -1;
+  preset_page_index = 0;
   screen = buildOverlayScreen();
   buildSubHeader(screen, T(STR_LABEL_PRESET_TITLE), [](lv_event_t*) { back_pending = true; });
 
@@ -193,9 +257,14 @@ void fetchPreview() {
     filamanFreeLabel(&preview);
     return;
   }
-  setStatus("");
   lv_obj_clear_state(pc_button, LV_STATE_DISABLED);
-  lv_obj_clear_state(printer_button, LV_STATE_DISABLED);
+  if (labelRasterFitsM220Media(preview)) {
+    setStatus("");
+    lv_obj_clear_state(printer_button, LV_STATE_DISABLED);
+  } else {
+    setStatus(T(STR_LABEL_M220_MEDIA));
+    lv_obj_add_state(printer_button, LV_STATE_DISABLED);
+  }
 }
 
 void buildPreviewScreen() {
@@ -264,7 +333,11 @@ void handleLabelPrintDeferredActions() {
   if (back_pending) {
     back_pending = false;
     if (preset_page) {
-      if (preset_from_preview) buildPreviewScreen();
+      if (preset_group >= 0) {
+        preset_group = -1;
+        preset_page_index = 0;
+        fillPresetList();
+      } else if (preset_from_preview) buildPreviewScreen();
       else {
         hideLabelPrintOverlays();
         requestPrinterSettingsScreen();
@@ -306,7 +379,7 @@ void handleLabelPrintDeferredActions() {
     if (address.isEmpty()) setStatus(T(STR_LABEL_M220_SELECT));
     else if (preview.pixels) {
       // This scale currently uses 40 x 30 mm M220 stock at 203 DPI.
-      if (preview.content_width != 320 || preview.height != 240) {
+      if (!labelRasterFitsM220Media(preview)) {
         setStatus(T(STR_LABEL_M220_MEDIA));
         return;
       }
@@ -352,4 +425,6 @@ void hideLabelPrintOverlays() {
   open_pending = settings_pending = change_pending = back_pending = false;
   fetch_pending = refresh_rows_pending = print_pending = false;
   preset_page = preset_from_preview = false;
+  preset_group = -1;
+  preset_page_index = 0;
 }

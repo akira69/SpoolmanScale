@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <esp_heap_caps.h>
 #include <math.h>
 #include <string.h>
 
@@ -87,8 +88,8 @@ static float roundGrams(float g) {
   return roundf(g);
 }
 
-#define FILAMAN_LABEL_PRESET_MAX  64
-#define FILAMAN_LABEL_PRESET_JSON_MAX  8192
+#define FILAMAN_LABEL_PRESET_MAX  100
+#define FILAMAN_LABEL_PRESET_JSON_MAX  65536
 
 int filamanListLabelPresets(const char* base_url, const char* api_key,
                             FilaManLabelPreset* out, size_t capacity, size_t* count,
@@ -106,7 +107,7 @@ int filamanListLabelPresets(const char* base_url, const char* api_key,
 
   const int declared = http.getSize();
   if (declared > FILAMAN_LABEL_PRESET_JSON_MAX) { http.end(); return -2; }
-  char* body = (char*)malloc(FILAMAN_LABEL_PRESET_JSON_MAX + 1);
+  char* body = (char*)heap_caps_malloc(FILAMAN_LABEL_PRESET_JSON_MAX + 1, MALLOC_CAP_SPIRAM);
   if (!body) { http.end(); return -2; }
   size_t used = 0;
   WiFiClient* stream = http.getStreamPtr();

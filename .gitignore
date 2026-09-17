@@ -4,6 +4,8 @@
 # Nur diese explizit erlauben
 !src/
 !src/**
+!tests/
+!tests/**
 !webflasher/
 !webflasher/**
 !.github/
