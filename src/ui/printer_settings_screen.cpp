@@ -180,7 +180,7 @@ void buildMainScreen() {
 
   lv_obj_t* preset = lv_btn_create(screen);
   lv_obj_set_size(preset, 112, 34);
-  lv_obj_set_pos(preset, 352, 8);
+  lv_obj_set_pos(preset, 308, 8);
   styleOutlineButton(preset);
   lv_obj_add_event_cb(preset, [](lv_event_t*) { requestLabelPresetSettingsScreen(); },
                       LV_EVENT_CLICKED, nullptr);
@@ -266,6 +266,7 @@ void buildMainScreen() {
   lv_obj_set_size(media, 456, 68);
   lv_obj_set_pos(media, 12, 244);
   styleListRow(media);
+  lv_obj_set_style_pad_all(media, 0, 0);
   lv_obj_add_event_cb(media, [](lv_event_t*) { sizes_pending = true; },
                       LV_EVENT_CLICKED, nullptr);
   lv_obj_t* media_title = addText(media, T(STR_PRINTER_LOADED_SIZE), UI_FONT_BODY,
