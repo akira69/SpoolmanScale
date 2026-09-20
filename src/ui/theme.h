@@ -43,6 +43,7 @@
 
 // ---- meaning -------------------------------------------------
 #define UI_COL_ACCENT          0x28d49a   // the house green: active, found, ok
+#define UI_COL_IDLE            0x606060   // configured but not currently active
 #define UI_COL_ACCENT_DIM      0x0d2e1a   // the fill behind an active choice
 #define UI_COL_OK_BG           0x1a4020   // a confirming button
 #define UI_COL_OK_BG_PRESSED   0x2a7030

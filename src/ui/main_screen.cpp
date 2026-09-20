@@ -174,7 +174,7 @@ void buildUI() {
 
   lbl_hdr_bt = lv_label_create(hdr);
   lv_label_set_text(lbl_hdr_bt, "\xEF\x8A\x93");  // Font Awesome Bluetooth (U+F293)
-  lv_obj_set_style_text_color(lbl_hdr_bt, lv_color_hex(0x28d49a), 0);
+  lv_obj_set_style_text_color(lbl_hdr_bt, lv_color_hex(UI_COL_IDLE), 0);
   lv_obj_set_style_text_font(lbl_hdr_bt, &lv_font_montserrat_ext_12, 0);
   lv_obj_add_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
 

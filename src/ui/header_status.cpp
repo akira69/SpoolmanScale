@@ -43,7 +43,7 @@ void layoutHeaderChips() {
   lv_obj_t *prev = lbl_hdr_sm;
   // AMS first, so it lands directly left of the backend badge: it belongs to
   // the backend, and the two read as a pair.
-  lv_obj_t *chain[] = { btn_hdr_ams, lbl_hdr_scl, btn_hdr_nfc, lbl_hdr_bt, lbl_hdr_wifi, lbl_hdr_sd };
+  lv_obj_t *chain[] = { btn_hdr_ams, lbl_hdr_scl, btn_hdr_nfc, lbl_hdr_wifi, lbl_hdr_bt, lbl_hdr_sd };
   for (unsigned i = 0; i < sizeof(chain) / sizeof(chain[0]); i++) {
     // Hidden counts as absent. lv_obj_align_to() reads nothing but the
     // reference object's geometry - the hidden flag never reaches it - so a
