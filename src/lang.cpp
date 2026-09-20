@@ -922,6 +922,18 @@ const char* const STRINGS[][3] = {
     "Imprimantes disponibles" },  // STR_PRINTER_AVAILABLE
   { "Suchen tippen, um Bluetooth-Drucker zu finden", "Tap Scan to find nearby Bluetooth printers",
     "Touchez Rechercher pour trouver les imprimantes Bluetooth" },  // STR_PRINTER_SCAN_HINT
+  { "Bluetooth-Suche", "Scan Bluetooth",
+    "Scan Bluetooth" },  // STR_PRINTER_SCAN
+  { "Keine Bluetooth-Geräte gefunden", "No Bluetooth devices found",
+    "Aucun appareil Bluetooth trouvé" },  // STR_PRINTER_SCAN_EMPTY
+  { "Bluetooth-Gerät wählen", "Select a Bluetooth device",
+    "Choisir un appareil Bluetooth" },  // STR_PRINTER_SELECT_DEVICE
+  { "Druckermodell", "Printer model",
+    "Modèle d'imprimante" },  // STR_PRINTER_MODEL
+  { "Experimentell", "Experimental",
+    "Expérimental" },  // STR_PRINTER_EXPERIMENTAL
+  { "Unbekanntes BLE-Gerät", "Unknown BLE device",
+    "Appareil BLE inconnu" },  // STR_PRINTER_UNKNOWN_DEVICE
   { "Eingelegte Labelgröße", "Loaded label size",
     "Taille d'étiquette chargée" },  // STR_PRINTER_LOADED_SIZE
   { "Breite im Drucker x Vorschublänge", "Width across printer x feed length",
