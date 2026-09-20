@@ -13,7 +13,7 @@ struct FilaManLabelPreset {
 
 inline int filamanParseLabelPresets(const char* json, FilaManLabelPreset* out,
                                     size_t capacity, size_t* count,
-                                    bool* selection_known) {
+                                    bool* selection_known = nullptr) {
   if (count) *count = 0;
   if (selection_known) *selection_known = false;
   if (!json || !out || !count || !capacity) return -1;
