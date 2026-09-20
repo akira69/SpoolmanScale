@@ -892,6 +892,14 @@ const char* const STRINGS[][3] = {
     "Pas de PSRAM pour l'étiquette. Vérifiez le matériel et la configuration." },  // STR_LABEL_PRINTER_NO_PSRAM
   { "Spulen", "Spools",
     "Bobines" },  // STR_SPOOLS_TITLE
+  { "Suchen", "Search",
+    "Rechercher" },  // STR_SPOOLS_SEARCH
+  { "Löschen", "Clear",
+    "Effacer" },  // STR_SPOOLS_CLEAR
+  { "Text oder #ID", "Text or #ID",
+    "Texte ou #ID" },  // STR_SPOOLS_SEARCH_HINT
+  { "Keine passenden Spulen", "No matching spools",
+    "Aucune bobine correspondante" },  // STR_SPOOLS_SEARCH_EMPTY
   { "Spulen laden...", "Loading spools...",
     "Chargement des bobines..." },  // STR_SPOOLS_LOADING
   { "Spulen nicht ladbar (HTTP %d)", "Could not load spools (HTTP %d)",
