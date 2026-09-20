@@ -331,7 +331,8 @@ void buildPreviewScreen() {
   styleOutlineButton(pc_button);
   lv_obj_set_style_pad_all(pc_button, 4, 0);
   lv_obj_add_event_cb(pc_button, [](lv_event_t*) {
-    if (preview.pixels && pc_request.request(spool_id, prefsGetInt("label_preset", 0)))
+    const int preset_id = prefsGetInt("label_preset", 0);
+    if (spool_id > 0 && preset_id >= 0 && pc_request.request(spool_id, preset_id))
       setStatus(T(STR_LABEL_PC_PENDING));
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* pc_label = lv_label_create(pc_button);
@@ -339,7 +340,8 @@ void buildPreviewScreen() {
   lv_obj_set_style_text_color(pc_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_set_style_text_font(pc_label, UI_FONT_SMALL, 0);
   lv_obj_center(pc_label);
-  lv_obj_add_state(pc_button, LV_STATE_DISABLED);
+  if (spool_id <= 0 || prefsGetInt("label_preset", 0) < 0)
+    lv_obj_add_state(pc_button, LV_STATE_DISABLED);
 
   printer_button = lv_btn_create(screen);
   lv_obj_set_size(printer_button, 140, 44);

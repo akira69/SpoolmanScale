@@ -75,7 +75,7 @@ void updateHeaderStatus() {
   if (lbl_btn_more) {
     lv_label_set_text(lbl_btn_more, T(STR_BTN_MORE_INFO));
     lv_obj_t* button = lv_obj_get_parent(lbl_btn_more);
-    if (tag_present) lv_obj_clear_flag(button, LV_OBJ_FLAG_HIDDEN);
+    if (spoolResolvedForActions(sm_found, sm_id)) lv_obj_clear_flag(button, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(button, LV_OBJ_FLAG_HIDDEN);
   }
 

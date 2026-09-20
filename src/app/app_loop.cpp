@@ -310,6 +310,15 @@ lv_obj_t *lbl_ok_ptr = nullptr;
 
 static unsigned long last_tag_seen_ms = 0;    // last NFC detection
 void cancelPendingNfcClear() { last_tag_seen_ms = 0; }
+void cancelRemoteTaglessAdoption() {
+  if (!aw_adopted) return;
+  aw_adopted = false;
+  aw_adopted_seen = false;
+  aw_done = false;
+  auto_weight_stable_ms = 0;
+  auto_weight_last_val = -9999.0f;
+  logSD("RemoteLink: tagless weighing cancelled by manual spool selection");
+}
 static unsigned long last_bambu_retry_ms = 0; // backoff between Bambu re-scans
 static unsigned long first_miss_ms = 0;       // start of the current detection gap
 static unsigned long tag_absent_since_ms = 0; // when the last removal was declared

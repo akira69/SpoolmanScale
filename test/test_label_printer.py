@@ -119,6 +119,16 @@ int main() {
   LabelRaster media{576, 240, 72, nullptr, 0, 320, false};
   assert(labelPrinterRasterFits(LabelPrinterModel::M220, media, 40, 30));
   assert(!labelPrinterRasterFits(LabelPrinterModel::M220, media, 30, 40));
+  LabelRaster rounded_50x80{576, 640, 72, nullptr, 0, 400, false};
+  assert(labelPrinterRasterFits(LabelPrinterModel::M220, rounded_50x80, 50, 80));
+  LabelRaster rounded_40x100{576, 800, 72, nullptr, 0, 320, false};
+  assert(labelPrinterRasterFits(LabelPrinterModel::M220, rounded_40x100, 40, 100));
+  LabelRaster rounded_down_64x33{576, 263, 72, nullptr, 0, 511, false};
+  assert(labelPrinterRasterFits(LabelPrinterModel::M220, rounded_down_64x33, 64, 33));
+  rounded_50x80.height = 641;
+  assert(!labelPrinterRasterFits(LabelPrinterModel::M220, rounded_50x80, 50, 80));
+  rounded_40x100.height = 797;
+  assert(!labelPrinterRasterFits(LabelPrinterModel::M220, rounded_40x100, 40, 100));
   media.content_width = 480;
   assert(!labelPrinterRasterFits(LabelPrinterModel::M220, media, 40, 30));
   assert(labelPrinterRasterWidth(LabelPrinterModel::M110, 40) == 384);

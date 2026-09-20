@@ -171,6 +171,7 @@ void handleManualSpoolDeferredActions() {
     if (tag_present) { setStatus(T(STR_SPOOLS_REMOVE_TAG)); return; }
     if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
     loadingOverlayShow(T(STR_SPOOLS_OPENING));
+    cancelRemoteTaglessAdoption();
     clearTagDisplay();
     bool found;
     {

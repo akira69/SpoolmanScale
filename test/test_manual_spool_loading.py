@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as tmp:
     header('Arduino.h', '#include <stddef.h>\n#include <stdint.h>\n')
     header('esp_heap_caps.h', '#include <stdlib.h>\n#define MALLOC_CAP_SPIRAM 0\ninline void* heap_caps_malloc(size_t n,int) { return malloc(n); }\ninline void heap_caps_free(void* p) { free(p); }\ninline void* heap_caps_realloc(void* p,size_t n,int) { return realloc(p,n); }\n')
     header('app/app_state.h', 'extern bool tag_present, sm_found; extern int sm_id;\n')
-    header('app/app_loop.h', 'void cancelPendingNfcClear();\n')
+    header('app/app_loop.h', 'void cancelPendingNfcClear(); void cancelRemoteTaglessAdoption();\n')
     header('hardware/sd_logger.h', '')
     header('services/backend.h', 'bool backendIsFilaMan(); const char* backendBaseUrl(); const char* filamanApiKey();\n')
     header('services/list_limits.h', 'extern int spool_list_limit;\n')
@@ -36,9 +36,10 @@ with tempfile.TemporaryDirectory() as tmp:
 #include <lvgl.h>
 #include <ArduinoJson.h>
 #include "ui/manual_spool_screen.h"
+#include "ui/main_screen_helpers.h"
 std::vector<lv_obj_t*> objects;
 bool wifi=true, tag_present=false, sm_found=false, lookup_ok=true, progress_active=false;
-int sm_id=0, spool_list_limit=20, response=200, pages=0, lookups=0, opened=0;
+int sm_id=0, spool_list_limit=20, response=200, pages=0, lookups=0, opened=0, adoption_resets=0;
 int loading_depth=0, loading_shown=0, loading_hidden=0;
 const char* T(int) { return "text"; }
 bool backendIsFilaMan() { return true; }
@@ -52,9 +53,10 @@ int filamanGetSpoolPageJson(const char*,const char*,int,int,JsonDocument& doc,in
   assert(loading_depth==1 && progress_active); ++pages; *total=1;
   deserializeJson(doc,R"([{"id":123,"filament":{"material":"PLA","name":"Blue"}}])"); return response;
 }
-bool querySpoolmanById(int id) { assert(loading_depth==1 && progress_active); ++lookups; sm_id=id; sm_found=lookup_ok; return lookup_ok; }
+bool querySpoolmanById(int id) { assert(adoption_resets==lookups+1); assert(loading_depth==1 && progress_active); ++lookups; sm_id=id; sm_found=lookup_ok; return lookup_ok; }
 void clearTagDisplay() { sm_found=false; }
 void cancelPendingNfcClear() {}
+void cancelRemoteTaglessAdoption() { ++adoption_resets; }
 void hideAllOverlays() { hideManualSpoolOverlays(); }
 void showMainScreen() {}
 void releaseScreen(lv_obj_t** p) { *p=nullptr; }
@@ -67,12 +69,15 @@ void select() {
 }
 void balanced(int before) { assert(loading_shown==before+1 && loading_hidden==loading_shown && loading_depth==0 && !progress_active); }
 int main() {
+  assert(spoolResolvedForActions(true,123));
+  assert(!spoolResolvedForActions(false,123));
+  assert(!spoolResolvedForActions(true,0));
   requestManualSpoolScreen(); handleManualSpoolDeferredActions(); balanced(0);
   int before=loading_shown;
-  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==1);
+  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==1 && adoption_resets==1);
   requestManualSpoolScreen(); handleManualSpoolDeferredActions();
   before=loading_shown; lookup_ok=false;
-  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==2);
+  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==2 && adoption_resets==2);
   before=loading_shown; tag_present=true;
   select(); handleManualSpoolDeferredActions(); assert(loading_shown==before && lookups==2);
   tag_present=false; wifi=false;

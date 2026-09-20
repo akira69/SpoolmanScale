@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+inline bool spoolResolvedForActions(bool found, int id) { return found && id > 0; }
+
 void updateLinkButton();
 
 // The status line's resting text while a tag lies on the pad: found, found

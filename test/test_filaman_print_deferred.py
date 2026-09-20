@@ -165,6 +165,10 @@ int main() {
   fetch_response=-3; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   assert(status_id==STR_LABEL_PRINTER_NO_PSRAM);
   assert(loading_shown==loading_hidden && loading_depth==0);
+  int before_posts=posts;
+  assert(!at(15,268)->disabled);
+  tap(15,268); handleLabelPrintDeferredActions();
+  assert(posts==before_posts+1 && sent_spool==123 && sent_preset==preset);
   fetch_response=200;
   for (auto model: {LabelPrinterModel::M220,LabelPrinterModel::M110}) {
     config.model=model;
@@ -200,6 +204,10 @@ int main() {
   content_delta=0; before=loading_shown;
   thumbnail_fail=true; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
   assert(status_id==STR_LABEL_PRINTER_NO_PSRAM);
+  before_posts=posts;
+  assert(!at(15,268)->disabled);
+  tap(15,268); handleLabelPrintDeferredActions();
+  assert(posts==before_posts+1 && sent_spool==123 && sent_preset==preset);
   thumbnail_fail=false;
   for (int code: {FILAMAN_LABEL_NO_PSRAM,500,401,403}) {
     before=loading_shown; fetch_response=code;

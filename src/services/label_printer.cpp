@@ -57,6 +57,13 @@ bool containsCaseInsensitive(const char* text, const char* needle) {
   }
   return false;
 }
+
+bool matchesRenderedDimension(uint16_t pixels, uint16_t mm) {
+  const uint16_t dots = labelPrinterDotsForMm(mm);
+  // FilaMan derives the second edge from the already-rounded first edge, so
+  // it can differ by one pixel from a direct mm-to-dot result.
+  return pixels >= dots - 1 && pixels <= dots + 1;
+}
 }
 
 const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model) {
@@ -146,8 +153,8 @@ bool labelPrinterRasterFits(LabelPrinterModel model, const LabelRaster& image,
   const LabelPrinterProfile& profile = labelPrinterProfile(model);
   return dimensionsValid(profile, media_width_mm, media_length_mm) &&
          image.width == labelPrinterRasterWidth(model, media_width_mm) &&
-         image.content_width == labelPrinterDotsForMm(media_width_mm) &&
-         image.height == labelPrinterDotsForMm(media_length_mm);
+         matchesRenderedDimension(image.content_width, media_width_mm) &&
+         matchesRenderedDimension(image.height, media_length_mm);
 }
 
 uint8_t labelPrinterDevicePriority(const LabelPrinterDevice& device,

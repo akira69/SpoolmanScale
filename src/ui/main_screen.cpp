@@ -439,7 +439,7 @@ void buildUI() {
   lv_obj_set_style_radius(btn_more, 6, 0);
   lv_obj_set_style_shadow_width(btn_more, 0, 0);
   lv_obj_add_event_cb(btn_more, [](lv_event_t *e){
-    if (tag_present) showMoreInfoScreen();
+    if (spoolResolvedForActions(sm_found, sm_id)) showMoreInfoScreen();
   }, LV_EVENT_CLICKED, NULL);
   lv_obj_t *lbl_more = lv_label_create(btn_more);
   lbl_btn_more = lbl_more;
