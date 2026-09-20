@@ -57,33 +57,6 @@ void buildSettingsScreen() {
   lv_obj_add_event_cb(btn_x, [](lv_event_t *e){ logSD("BTN: Close -> Main"); showMainScreen(); }, LV_EVENT_CLICKED, NULL);
 
   const bool label_print = backendIsFilaMan() && !prefsGetString("m220_addr").isEmpty();
-  if (label_print) {
-    lv_obj_t* print = lv_btn_create(scr_settings);
-    lv_obj_set_size(print, 148, 44);
-    lv_obj_set_pos(print, 4, 2);
-    lv_obj_set_style_bg_color(print, lv_color_hex(UI_COL_ROW), 0);
-    lv_obj_set_style_bg_color(print, lv_color_hex(UI_COL_ROW_PRESSED), LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(print, lv_color_hex(UI_COL_LINE), 0);
-    lv_obj_set_style_border_width(print, 1, 0);
-    lv_obj_set_style_radius(print, UI_RADIUS_BTN, 0);
-    lv_obj_set_style_shadow_width(print, 0, 0);
-    lv_obj_set_style_pad_all(print, 0, 0);
-    lv_obj_add_event_cb(print, [](lv_event_t*) { requestManualSpoolScreen(); },
-                        LV_EVENT_CLICKED, nullptr);
-
-    lv_obj_t* icon = lv_label_create(print);
-    lv_label_set_text(icon, kPrinterIcon);
-    lv_obj_set_style_text_color(icon, lv_color_hex(UI_COL_ACCENT), 0);
-    lv_obj_set_style_text_font(icon, &lv_font_printer_24, 0);
-    lv_obj_align(icon, LV_ALIGN_LEFT_MID, 10, 0);
-
-    lv_obj_t* label = lv_label_create(print);
-    lv_label_set_text(label, T(STR_LABEL_PRINT));
-    lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
-    lv_obj_set_style_text_font(label, UI_FONT_SMALL, 0);
-    lv_obj_align(label, LV_ALIGN_LEFT_MID, 42, 0);
-  }
-
   // Names the active backend, so it is copied through backendText first.
   char conn_sub[40];
   backendText(T(STR_TILE_CONN_SUB), conn_sub, sizeof(conn_sub));
@@ -98,7 +71,8 @@ void buildSettingsScreen() {
     { LV_SYMBOL_SETTINGS, T(STR_TILE_SYSTEM),     T(STR_TILE_SYSTEM_SUB),  0x0a1e30 },
   };
   int tx[] = { 8, 242, 8, 242 };
-  int ty[] = { 60, 60, 186, 186 };
+  int ty[] = { 60, 60, label_print ? 150 : 186, label_print ? 150 : 186 };
+  const int tile_height = label_print ? 82 : 118;
 
   // Kept so the update dot can be anchored to it after the loop.
   lv_obj_t *tile_system = nullptr;
@@ -106,7 +80,7 @@ void buildSettingsScreen() {
   for (int i = 0; i < 4; i++) {
     lv_obj_t *tile = lv_btn_create(scr_settings);
     if (i == 3) tile_system = tile;
-    lv_obj_set_size(tile, 226, 118);
+    lv_obj_set_size(tile, 226, tile_height);
     lv_obj_set_pos(tile, tx[i], ty[i]);
     lv_obj_set_style_bg_color(tile, lv_color_hex(tiles[i].col), 0);
     lv_obj_set_style_bg_color(tile, lv_color_hex(tiles[i].col + 0x101010), LV_STATE_PRESSED);
@@ -169,6 +143,32 @@ void buildSettingsScreen() {
   }
 
   lbl_system_badge = createUpdateBadge(scr_settings, tile_system);
+
+  if (label_print) {
+    lv_obj_t* print = lv_btn_create(scr_settings);
+    lv_obj_set_size(print, 456, 72);
+    lv_obj_set_pos(print, 12, 240);
+    lv_obj_set_style_bg_color(print, lv_color_hex(UI_COL_ROW), 0);
+    lv_obj_set_style_bg_color(print, lv_color_hex(UI_COL_ROW_PRESSED), LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(print, lv_color_hex(UI_COL_LINE), 0);
+    lv_obj_set_style_border_width(print, 1, 0);
+    lv_obj_set_style_radius(print, UI_RADIUS_ROW, 0);
+    lv_obj_set_style_shadow_width(print, 0, 0);
+    lv_obj_add_event_cb(print, [](lv_event_t*) { requestManualSpoolScreen(); },
+                        LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t* icon = lv_label_create(print);
+    lv_label_set_text(icon, kPrinterIcon);
+    lv_obj_set_style_text_color(icon, lv_color_hex(UI_COL_ACCENT), 0);
+    lv_obj_set_style_text_font(icon, &lv_font_printer_24, 0);
+    lv_obj_align(icon, LV_ALIGN_LEFT_MID, 16, 0);
+
+    lv_obj_t* label = lv_label_create(print);
+    lv_label_set_text(label, T(STR_LABEL_PRINT));
+    lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
+    lv_obj_set_style_text_font(label, UI_FONT_TITLE, 0);
+    lv_obj_align(label, LV_ALIGN_LEFT_MID, 62, 0);
+  }
 
   if (sd_verbose) logSD("[verbose] buildSettingsScreen: done");
 }
