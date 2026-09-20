@@ -31,17 +31,20 @@ void filamanFreeLabel(LabelRaster* image) {
 }
 
 int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_id,
-                          int preset_id, uint16_t requested_width, LabelRaster* out,
+                          int preset_id, uint16_t requested_width, const char* orientation,
+                          LabelRaster* out,
                           uint32_t timeout_ms) {
   if (!out) return -1;
   *out = {};
   if (!base_url || strlen(base_url) <= 7 || !api_key || !api_key[0] ||
       spool_id <= 0 || preset_id < 0 || requested_width < 384 ||
+      (!orientation || (strcmp(orientation, "landscape") && strcmp(orientation, "portrait"))) ||
       requested_width > 1024) return -1;
 
   HttpStallTime stall;
   String url = String(base_url) + "/api/v1/labels/spool/" + spool_id +
-               "/render?format=mono1&dpi=203&align=right&orientation=landscape&width=" + requested_width;
+               "/render?format=mono1&dpi=203&align=right&orientation=" + orientation +
+               "&width=" + requested_width;
   if (preset_id) url += String("&preset_id=") + preset_id;
   HTTPClient http;
   if (!http.begin(url)) return -1;

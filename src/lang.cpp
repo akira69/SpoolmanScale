@@ -832,49 +832,106 @@ const char* const STRINGS[][3] = {
   { "Zu viele Lagerorte - nicht alle angezeigt",
     "Too many locations - not all shown",
     "Trop d'emplacements - tous ne sont pas affichés" },  // STR_LOCATION_LIMIT_HIT
-  { "Label drucken", "Print label" }, // STR_LABEL_PRINT
-  { "Label-Vorschau", "Label preview" }, // STR_LABEL_PREVIEW
-  { "Vorlage ändern", "Change preset" }, // STR_LABEL_CHANGE_PRESET
-  { "Label-Vorlage", "Label preset" }, // STR_LABEL_PRESET_TITLE
-  { "Standard-Label", "Default label" }, // STR_LABEL_DEFAULT
-  { "Aktualisieren", "Refresh" }, // STR_LABEL_REFRESH
-  { "Lade Vorlagen...", "Loading presets..." }, // STR_LABEL_LOADING
-  { "Keine Vorlagen gespeichert", "No saved presets" }, // STR_LABEL_NONE
-  { "Kein WLAN", "No WiFi" }, // STR_LABEL_NO_WIFI
-  { "Vorlagen konnten nicht geladen werden", "Could not load presets" }, // STR_LABEL_LOAD_FAIL
-  { "Gespeicherte Vorlage wurde entfernt; Standard gewählt", "Saved preset was removed; default selected" }, // STR_LABEL_PRESET_REMOVED
-  { "Auf PC öffnen", "Open on PC" }, // STR_LABEL_PC_OPEN
-  { "Anfrage wird gesendet...", "Sending request..." }, // STR_LABEL_PC_PENDING
-  { "Anfrage eingereiht - im FilaMan-Tab bestätigen. Dort Drucken oder PDF exportieren.", "Request queued - approve it in the FilaMan tab. Choose Print or Export PDF there." }, // STR_LABEL_PC_QUEUED
-  { "API-Key prüfen.", "Check the user API key." }, // STR_LABEL_PC_KEY
-  { "Benutzer-API-Key mit spools:read verwenden.", "Use a user API key with spools:read." }, // STR_LABEL_PC_SCOPE
-  { "Spule oder Vorlage aktualisieren und erneut wählen.", "Refresh the spool or preset and select again." }, // STR_LABEL_PC_MISSING
-  { "Spule oder Vorlage prüfen und korrigieren.", "Check and correct the spool or preset." }, // STR_LABEL_PC_INVALID
-  { "Anfrage fehlgeschlagen. Im FilaMan-Tab prüfen, bevor erneut gesendet wird.", "Request failed. Check the FilaMan tab before sending again." }, // STR_LABEL_PC_FAILED
-  { "M220 suchen", "Scan M220" }, // STR_LABEL_M220_SCAN
-  { "Auf M220 drucken", "Print on M220" }, // STR_LABEL_M220_PRINT
-  { "Kein M220 gefunden", "No M220 found" }, // STR_LABEL_M220_NONE
-  { "M220 auswählen", "Select an M220" }, // STR_LABEL_M220_SELECT
-  { "40x30 oder 30x40 mm Preset wählen", "Select a 40x30 or 30x40 mm preset" }, // STR_LABEL_M220_MEDIA
-  { "Label wird geladen...", "Fetching label..." }, // STR_LABEL_M220_FETCH
-  { "Sende an M220...", "Sending to M220..." }, // STR_LABEL_M220_SEND
-  { "An Drucker gesendet", "Sent to printer" }, // STR_LABEL_M220_SENT
-  { "Label konnte nicht geladen werden", "Could not fetch label" }, // STR_LABEL_M220_FAILED
-  { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration." }, // STR_LABEL_M220_NO_PSRAM
-  { "Spulen", "Spools" }, // STR_SPOOLS_TITLE
-  { "Spulen laden...", "Loading spools..." }, // STR_SPOOLS_LOADING
-  { "Spulen nicht ladbar (HTTP %d)", "Could not load spools (HTTP %d)" }, // STR_SPOOLS_LOAD_FAIL
-  { "Keine aktiven Spulen", "No active spools" }, // STR_SPOOLS_EMPTY
-  { "Seite %d von %d (%d Spulen)", "Page %d of %d (%d spools)" }, // STR_SPOOLS_PAGE_FMT
-  { "Anzeigespeicher knapp; Spulen neu öffnen", "Display memory low; reopen Spools" }, // STR_SPOOLS_LOW_MEM
-  { "NFC-Tag zuerst entfernen", "Remove the NFC tag first" }, // STR_SPOOLS_REMOVE_TAG
-  { "Spule laden...", "Loading spool..." }, // STR_SPOOLS_OPENING
-  { "Spule konnte nicht geladen werden", "Could not load that spool" }, // STR_SPOOLS_OPEN_FAIL
-  { "Drucker", "Printer" }, // STR_PRINTER_TITLE
-  { "Kein Drucker ausgewählt", "No printer selected" }, // STR_PRINTER_NONE
-  { "Ausgewählt: %s", "Selected: %s" }, // STR_PRINTER_SELECTED_FMT
-  { "Drucker löschen", "Clear printer" }, // STR_PRINTER_CLEAR
-  { "Suche Drucker...", "Scanning for printers..." }, // STR_PRINTER_SCANNING
+  { "Label drucken", "Print label",
+    "Imprimer l'étiquette" },  // STR_LABEL_PRINT
+  { "Label-Vorschau", "Label preview",
+    "Aperçu de l'étiquette" },  // STR_LABEL_PREVIEW
+  { "Vorlage ändern", "Change preset",
+    "Changer de modèle" },  // STR_LABEL_CHANGE_PRESET
+  { "Label-Vorlage", "Label preset",
+    "Modèle d'étiquette" },  // STR_LABEL_PRESET_TITLE
+  { "Standard-Label", "Default label",
+    "Étiquette par défaut" },  // STR_LABEL_DEFAULT
+  { "Aktualisieren", "Refresh",
+    "Actualiser" },  // STR_LABEL_REFRESH
+  { "Lade Vorlagen...", "Loading presets...",
+    "Chargement des modèles..." },  // STR_LABEL_LOADING
+  { "Keine Vorlagen gespeichert", "No saved presets",
+    "Aucun modèle enregistré" },  // STR_LABEL_NONE
+  { "Kein WLAN", "No WiFi",
+    "Pas de WiFi" },  // STR_LABEL_NO_WIFI
+  { "Vorlagen konnten nicht geladen werden", "Could not load presets",
+    "Impossible de charger les modèles" },  // STR_LABEL_LOAD_FAIL
+  { "Gespeicherte Vorlage wurde entfernt; Standard gewählt", "Saved preset was removed; default selected",
+    "Le modèle enregistré a été supprimé ; modèle par défaut sélectionné" },  // STR_LABEL_PRESET_REMOVED
+  { "Auf PC öffnen", "Open on PC",
+    "Ouvrir sur le PC" },  // STR_LABEL_PC_OPEN
+  { "Anfrage wird gesendet...", "Sending request...",
+    "Envoi de la demande..." },  // STR_LABEL_PC_PENDING
+  { "Anfrage eingereiht - im FilaMan-Tab bestätigen. Dort Drucken oder PDF exportieren.", "Request queued - approve it in the FilaMan tab. Choose Print or Export PDF there.",
+    "Demande mise en file - confirmez-la dans l'onglet FilaMan. Choisissez Imprimer ou Exporter en PDF." },  // STR_LABEL_PC_QUEUED
+  { "API-Key prüfen.", "Check the user API key.",
+    "Vérifiez la clé API utilisateur." },  // STR_LABEL_PC_KEY
+  { "Benutzer-API-Key mit spools:read verwenden.", "Use a user API key with spools:read.",
+    "Utilisez une clé API utilisateur avec spools:read." },  // STR_LABEL_PC_SCOPE
+  { "Spule oder Vorlage aktualisieren und erneut wählen.", "Refresh the spool or preset and select again.",
+    "Actualisez la bobine ou le modèle et sélectionnez à nouveau." },  // STR_LABEL_PC_MISSING
+  { "Spule oder Vorlage prüfen und korrigieren.", "Check and correct the spool or preset.",
+    "Vérifiez et corrigez la bobine ou le modèle." },  // STR_LABEL_PC_INVALID
+  { "Anfrage fehlgeschlagen. Im FilaMan-Tab prüfen, bevor erneut gesendet wird.", "Request failed. Check the FilaMan tab before sending again.",
+    "Échec de la demande. Vérifiez l'onglet FilaMan avant de renvoyer." },  // STR_LABEL_PC_FAILED
+  { "M220 suchen", "Scan M220",
+    "Rechercher M220" },  // STR_LABEL_M220_SCAN
+  { "Auf M220 drucken", "Print on M220",
+    "Imprimer sur M220" },  // STR_LABEL_M220_PRINT
+  { "Kein M220 gefunden", "No M220 found",
+    "Aucune M220 trouvée" },  // STR_LABEL_M220_NONE
+  { "M220 auswählen", "Select an M220",
+    "Sélectionner une M220" },  // STR_LABEL_M220_SELECT
+  { "Vorlage muss zum eingelegten %u x %u mm Label passen", "Preset must match the loaded %u x %u mm label",
+    "Le modèle doit correspondre à l'étiquette chargée de %u x %u mm" },  // STR_LABEL_M220_MEDIA
+  { "Label wird geladen...", "Fetching label...",
+    "Chargement de l'étiquette..." },  // STR_LABEL_M220_FETCH
+  { "Sende an M220...", "Sending to M220...",
+    "Envoi vers la M220..." },  // STR_LABEL_M220_SEND
+  { "An Drucker gesendet", "Sent to printer",
+    "Envoyé à l'imprimante" },  // STR_LABEL_M220_SENT
+  { "Label konnte nicht geladen werden", "Could not fetch label",
+    "Impossible de charger l'étiquette" },  // STR_LABEL_M220_FAILED
+  { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration.",
+    "Pas de PSRAM pour l'étiquette. Vérifiez le matériel et la configuration." },  // STR_LABEL_M220_NO_PSRAM
+  { "Spulen", "Spools",
+    "Bobines" },  // STR_SPOOLS_TITLE
+  { "Spulen laden...", "Loading spools...",
+    "Chargement des bobines..." },  // STR_SPOOLS_LOADING
+  { "Spulen nicht ladbar (HTTP %d)", "Could not load spools (HTTP %d)",
+    "Impossible de charger les bobines (HTTP %d)" },  // STR_SPOOLS_LOAD_FAIL
+  { "Keine aktiven Spulen", "No active spools",
+    "Aucune bobine active" },  // STR_SPOOLS_EMPTY
+  { "Seite %d von %d (%d Spulen)", "Page %d of %d (%d spools)",
+    "Page %d sur %d (%d bobines)" },  // STR_SPOOLS_PAGE_FMT
+  { "Anzeigespeicher knapp; Spulen neu öffnen", "Display memory low; reopen Spools",
+    "Mémoire d'affichage faible ; rouvrez Bobines" },  // STR_SPOOLS_LOW_MEM
+  { "NFC-Tag zuerst entfernen", "Remove the NFC tag first",
+    "Retirez d'abord le tag NFC" },  // STR_SPOOLS_REMOVE_TAG
+  { "Spule laden...", "Loading spool...",
+    "Chargement de la bobine..." },  // STR_SPOOLS_OPENING
+  { "Spule konnte nicht geladen werden", "Could not load that spool",
+    "Impossible de charger cette bobine" },  // STR_SPOOLS_OPEN_FAIL
+  { "Drucker", "Printer",
+    "Imprimante" },  // STR_PRINTER_TITLE
+  { "Kein Drucker ausgewählt", "No printer selected",
+    "Aucune imprimante sélectionnée" },  // STR_PRINTER_NONE
+  { "Ausgewählter Drucker", "Selected printer",
+    "Imprimante sélectionnée" },  // STR_PRINTER_SELECTED
+  { "Vergessen", "Forget",
+    "Oublier" },  // STR_PRINTER_CLEAR
+  { "Suche Drucker...", "Scanning for printers...",
+    "Recherche d'imprimantes..." },  // STR_PRINTER_SCANNING
+  { "Verfügbare Drucker", "Available printers",
+    "Imprimantes disponibles" },  // STR_PRINTER_AVAILABLE
+  { "Suchen tippen, um Bluetooth-Drucker zu finden", "Tap Scan to find nearby Bluetooth printers",
+    "Touchez Rechercher pour trouver les imprimantes Bluetooth" },  // STR_PRINTER_SCAN_HINT
+  { "Eingelegte Labelgröße", "Loaded label size",
+    "Taille d'étiquette chargée" },  // STR_PRINTER_LOADED_SIZE
+  { "Breite im Drucker x Vorschublänge", "Width across printer x feed length",
+    "Largeur dans l'imprimante x longueur d'avance" },  // STR_PRINTER_SIZE_HELP
+  { "Benutzerdefiniert", "Custom",
+    "Personnalisée" },  // STR_PRINTER_CUSTOM_SIZE
+  { "Breite im Drucker", "Width across printer",
+    "Largeur dans l'imprimante" },  // STR_PRINTER_WIDTH_ACROSS
+  { "Vorschublänge", "Feed length",
+    "Longueur d'avance" },  // STR_PRINTER_FEED_LENGTH
   { "Ortsabfrage bei Entnahme", "Location on removal",
     "Demander l'emplacement au retrait" },  // STR_BTN_AUTO_LOC_POPUP
   { "Trocknungserinnerung",     "Drying Reminder",     "Rappel de séchage" },  // STR_BTN_DRYING_REMINDER

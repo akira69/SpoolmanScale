@@ -46,6 +46,8 @@ bool back_pending = false;
 bool fetch_pending = false;
 bool refresh_rows_pending = false;
 bool print_pending = false;
+uint16_t preview_media_width_mm = M220_DEFAULT_MEDIA_WIDTH_MM;
+uint16_t preview_media_length_mm = M220_DEFAULT_MEDIA_LENGTH_MM;
 
 void setStatus(const char* message) {
   if (status) lv_label_set_text(status, message);
@@ -53,6 +55,19 @@ void setStatus(const char* message) {
 
 void setHttpError(const char* message, int code) {
   if (status) lv_label_set_text_fmt(status, "%s (%d)", message, code);
+}
+
+uint16_t mediaDimension(const char* key, uint16_t fallback, uint16_t minimum,
+                        uint16_t maximum) {
+  const int saved = prefsGetInt(key, fallback);
+  return saved >= minimum && saved <= maximum ? saved : fallback;
+}
+
+void setMediaMismatch() {
+  char message[96];
+  snprintf(message, sizeof(message), T(STR_LABEL_M220_MEDIA),
+           unsigned(preview_media_width_mm), unsigned(preview_media_length_mm));
+  setStatus(message);
 }
 
 void addPresetRow(int id, const char* name) {
@@ -240,12 +255,14 @@ void fetchPreview() {
   if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
   setStatus(T(STR_LABEL_M220_FETCH));
   lv_refr_now(nullptr);
-  const int saved_width = prefsGetInt("m220_width", 576);
-  const uint16_t width = saved_width >= 384 && saved_width <= 576 && saved_width % 8 == 0
-    ? saved_width : 576;
+  preview_media_width_mm = mediaDimension("m220_media_w", M220_DEFAULT_MEDIA_WIDTH_MM, 20, 75);
+  preview_media_length_mm = mediaDimension("m220_media_h", M220_DEFAULT_MEDIA_LENGTH_MM, 10, 150);
+  const uint16_t width = m220RasterWidthForMedia(preview_media_width_mm);
+  const char* orientation = preview_media_width_mm >= preview_media_length_mm
+      ? "landscape" : "portrait";
   const int code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
                                          spool_id, prefsGetInt("label_preset", 0),
-                                         width, &preview);
+                                         width, orientation, &preview);
   if (code != 200) {
     switch (code) {
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
@@ -261,11 +278,12 @@ void fetchPreview() {
     return;
   }
   lv_obj_clear_state(pc_button, LV_STATE_DISABLED);
-  if (labelRasterFitsM220Media(preview)) {
+  if (labelRasterFitsM220Media(preview, preview_media_width_mm,
+                              preview_media_length_mm)) {
     setStatus("");
     lv_obj_clear_state(printer_button, LV_STATE_DISABLED);
   } else {
-    setStatus(T(STR_LABEL_M220_MEDIA));
+    setMediaMismatch();
     lv_obj_add_state(printer_button, LV_STATE_DISABLED);
   }
 }
@@ -384,9 +402,9 @@ void handleLabelPrintDeferredActions() {
     String address = prefsGetString("m220_addr");
     if (address.isEmpty()) setStatus(T(STR_LABEL_M220_SELECT));
     else if (preview.pixels) {
-      // This scale currently uses 40 x 30 mm M220 stock at 203 DPI.
-      if (!labelRasterFitsM220Media(preview)) {
-        setStatus(T(STR_LABEL_M220_MEDIA));
+      if (!labelRasterFitsM220Media(preview, preview_media_width_mm,
+                                   preview_media_length_mm)) {
+        setMediaMismatch();
         return;
       }
       setStatus(T(STR_LABEL_M220_SEND));

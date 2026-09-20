@@ -35,7 +35,7 @@ int main() {
   assert(!labelPresetsUseGroups(10));
   assert(labelPresetsUseGroups(11));
   LabelRaster correct{576, 240, 72, nullptr, 0, 320, false};
-  assert(labelRasterFitsM220Media(correct));
+  assert(labelRasterFitsM220Media(correct, 40, 30));
   correct.content_width = 480;
-  assert(!labelRasterFitsM220Media(correct));
+  assert(!labelRasterFitsM220Media(correct, 40, 30));
 }

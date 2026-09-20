@@ -146,7 +146,7 @@ No extra fields needed. Tags are written to FilaMan's native `rfid_uid` field, a
 
 FilaMan needs an **API key** and a **device token**. Both are entered through the scale's built-in webserver, same page as the firmware update. The scale has a button that takes you straight there.
 
-To print without NFC, tap **Spools** on the scale's main screen, choose an active FilaMan spool, then tap **Print label** in its details. Choose a saved label preset or the default, and either send the job to FilaMan for printing or PDF export on a PC, or print over Bluetooth. For Bluetooth, first open **Settings → Connection → Printer**, scan for an M220, select it, and adjust the printable width if needed. No printer is selected by default; a Bluetooth icon beside WiFi appears only while FilaMan is active and a printer is saved.
+To print without NFC, tap **Spools** on the scale's main screen, choose an active FilaMan spool, then tap **Print label** in its details. Choose a saved label preset or the default, and either send the job to FilaMan for printing or PDF export on a PC, or print over Bluetooth. For Bluetooth, first open **Settings → Connection → Printer**, scan for an M220, select it, and choose the loaded label size as width across the printer × feed length. Common sizes are one tap and custom sizes cover 20–75 mm wide labels. No printer is selected by default; a Bluetooth icon beside WiFi appears only while FilaMan is active and a printer is saved.
 
 > An API key inherits the permissions of the user who created it. If you would rather not hand the scale an admin key, create a separate user with a limited role. The exact list of permissions SpoolmanScale needs is behind the ℹ️ button on that page.
 

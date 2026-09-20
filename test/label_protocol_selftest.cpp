@@ -1,4 +1,5 @@
 #include "services/label_raster.h"
+#include "services/phomemo_m220.h"
 #include "services/phomemo_m220_protocol.h"
 #include <array>
 #include <cassert>
@@ -24,4 +25,11 @@ int main() {
   rotated_rows[48 + 47] = 0x04;
   assert(labelRasterPreviewBlack(rotated, 0, 0));
   assert(!labelRasterPreviewBlack(rotated, 1, 0));
+  assert(m220DotsForMm(40) == 320);
+  assert(m220DotsForMm(30) == 240);
+  assert(m220RasterWidthForMedia(40) == 576);
+  assert(m220RasterWidthForMedia(75) == 600);
+  LabelRaster media{576, 240, 72, rotated_rows, sizeof(rotated_rows), 320, false};
+  assert(labelRasterFitsM220Media(media, 40, 30));
+  assert(!labelRasterFitsM220Media(media, 30, 40));
 }

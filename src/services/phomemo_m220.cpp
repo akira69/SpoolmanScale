@@ -108,7 +108,7 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
   if (error_size) error[0] = 0;
   if (!address || !*address) return fail("Select an M220 printer first.");
   if (!labelRasterPaddingValid(image)) return fail("Invalid label image.");
-  if (image.width > 576) return fail("M220 width exceeds print head.");
+  if (image.width > M220_MAX_RASTER_WIDTH) return fail("M220 width exceeds print head.");
   if (s_client_unresolved) return fail("M220 BLE cleanup pending. Restart scale before retrying.");
   Serial.printf("M220 before client: heap=%u largest=%u psram=%u\n",
                 unsigned(ESP.getFreeHeap()),

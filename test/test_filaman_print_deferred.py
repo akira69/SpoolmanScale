@@ -92,7 +92,7 @@ String prefsGetString(const char*) { return String("aa:bb:cc:dd:ee:ff"); }
 bool prefsPutString(const char*,const char*) { return true; }
 int filamanListLabelPresets(const char*,const char*,FilaManLabelPreset* out,size_t,size_t* count) { ++preset_fetches; out[0].id=7; out[0].name[0]='A'; out[0].name[1]=0; *count=1; return 200; }
 int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return response; }
-int filamanFetchMonoLabel(const char*,const char*,int,int,uint16_t,LabelRaster*,uint32_t) { return fetch_response; }
+int filamanFetchMonoLabel(const char*,const char*,int,int,uint16_t,const char*,LabelRaster* out,uint32_t) { static uint8_t pixels[40*240]{}; if (fetch_response==200) *out={320,240,40,pixels,sizeof(pixels),320,false}; return fetch_response; }
 void filamanFreeLabel(LabelRaster*) {}
 size_t phomemoM220Scan(M220Device*,size_t) { return 0; }
 bool phomemoM220Print(const char*,const LabelRaster&,char*,size_t) { return false; }
