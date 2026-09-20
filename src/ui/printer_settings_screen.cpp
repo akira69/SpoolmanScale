@@ -19,6 +19,7 @@
 
 namespace {
 enum class Page { MAIN, MODELS, SIZES, CUSTOM };
+enum class SaveAction { NONE, REFRESH_DEVICE, MAIN };
 struct MediaSize { uint8_t width, length; };
 struct Adjustment { bool width; int8_t amount; };
 
@@ -42,6 +43,8 @@ lv_obj_t* custom_length_label = nullptr;
 lv_obj_t* custom_save_label = nullptr;
 LabelPrinterDevice devices[24];
 LabelPrinterConfig config{};
+LabelPrinterConfig pending_config{};
+SaveAction save_pending = SaveAction::NONE;
 size_t device_count = 0;
 Page page = Page::MAIN;
 bool open_pending = false;
@@ -50,17 +53,12 @@ bool scan_pending = false;
 bool sizes_pending = false;
 bool models_pending = false;
 bool custom_pending = false;
-bool main_pending = false;
 uint16_t custom_width = 0;
 uint16_t custom_length = 0;
 
-bool saveConfig(const LabelPrinterConfig& next) {
-  if (!labelPrinterSaveConfig(next)) {
-    showInfoPopup(STR_PRINTER_TITLE, STR_ERR_SAVE, INFO_WARN);
-    return false;
-  }
-  config = next;
-  return true;
+void queueConfig(const LabelPrinterConfig& next, SaveAction action) {
+  pending_config = next;
+  save_pending = action;
 }
 
 bool mediaFits(const LabelPrinterProfile& profile, uint16_t width, uint16_t length) {
@@ -68,11 +66,11 @@ bool mediaFits(const LabelPrinterProfile& profile, uint16_t width, uint16_t leng
          length >= profile.min_length_mm && length <= profile.max_length_mm;
 }
 
-bool saveMedia(uint16_t width, uint16_t length) {
+void queueMedia(uint16_t width, uint16_t length) {
   LabelPrinterConfig next = config;
   next.media_width_mm = width;
   next.media_length_mm = length;
-  return saveConfig(next);
+  queueConfig(next, SaveAction::MAIN);
 }
 
 const char* deviceName(const LabelPrinterDevice& device) {
@@ -161,7 +159,7 @@ void renderDevices() {
         LabelPrinterConfig next = config;
         snprintf(next.name, sizeof(next.name), "%s", devices[i].name);
         snprintf(next.address, sizeof(next.address), "%s", address);
-        if (saveConfig(next)) updateSavedAddress();
+        queueConfig(next, SaveAction::REFRESH_DEVICE);
         break;
       }
     }, LV_EVENT_CLICKED, devices[i].address);
@@ -178,7 +176,6 @@ void renderDevices() {
 }
 
 void buildMainScreen() {
-  config = labelPrinterLoadConfig();
   beginScreen(T(STR_PRINTER_TITLE), Page::MAIN);
 
   lv_obj_t* preset = lv_btn_create(screen);
@@ -215,7 +212,7 @@ void buildMainScreen() {
   lv_obj_add_event_cb(forget_button, [](lv_event_t*) {
     LabelPrinterConfig next = config;
     next.address[0] = next.name[0] = '\0';
-    if (saveConfig(next)) updateSavedAddress();
+    queueConfig(next, SaveAction::REFRESH_DEVICE);
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* forget_text = addText(forget_button, T(STR_PRINTER_CLEAR), UI_FONT_SMALL, UI_COL_INK_2);
   lv_obj_center(forget_text);
@@ -309,7 +306,7 @@ void buildModelScreen() {
         next.media_width_mm = profile.default_width_mm;
         next.media_length_mm = profile.default_length_mm;
       }
-      if (saveConfig(next)) main_pending = true;
+      queueConfig(next, SaveAction::MAIN);
     }, LV_EVENT_CLICKED, reinterpret_cast<void*>(static_cast<intptr_t>(model)));
     lv_obj_t* name = addText(row, profile.name, UI_FONT_BODY, UI_COL_INK_2);
     lv_obj_align(name, LV_ALIGN_LEFT_MID, 14, profile.experimental ? -12 : 0);
@@ -360,7 +357,7 @@ void buildSizeScreen() {
     addSizeRow(text, size.width == width && size.length == length,
       [](lv_event_t* event) {
         const MediaSize* size = static_cast<const MediaSize*>(lv_event_get_user_data(event));
-        if (saveMedia(size->width, size->length)) main_pending = true;
+        queueMedia(size->width, size->length);
       }, const_cast<MediaSize*>(&size));
   }
   char custom_text[40];
@@ -445,7 +442,7 @@ void buildCustomScreen() {
   lv_obj_set_pos(save, 100, 246);
   styleOutlineButton(save);
   lv_obj_add_event_cb(save, [](lv_event_t*) {
-    if (saveMedia(custom_width, custom_length)) main_pending = true;
+    queueMedia(custom_width, custom_length);
   }, LV_EVENT_CLICKED, nullptr);
   custom_save_label = addText(save, "", UI_FONT_BODY, UI_COL_ACCENT);
   lv_obj_center(custom_save_label);
@@ -462,7 +459,21 @@ void handlePrinterSettingsDeferredActions() {
     if (!backendIsFilaMan()) return;
     hideAllOverlays();
     closeConnectionScreen();
+    config = labelPrinterLoadConfig();
     buildMainScreen();
+    return;
+  }
+  if (save_pending != SaveAction::NONE) {
+    const SaveAction action = save_pending;
+    save_pending = SaveAction::NONE;
+    // LVGL callbacks run with queued prefs writes; only here can saving report failure.
+    if (!labelPrinterSaveConfig(pending_config)) {
+      showInfoPopup(STR_PRINTER_TITLE, STR_ERR_SAVE, INFO_WARN);
+      return;
+    }
+    config = pending_config;
+    if (action == SaveAction::MAIN) buildMainScreen();
+    else updateSavedAddress();
     return;
   }
   if (back_pending) {
@@ -478,7 +489,6 @@ void handlePrinterSettingsDeferredActions() {
     }
     return;
   }
-  if (main_pending) { main_pending = false; buildMainScreen(); return; }
   if (models_pending) { models_pending = false; buildModelScreen(); return; }
   if (sizes_pending) { sizes_pending = false; buildSizeScreen(); return; }
   if (custom_pending) { custom_pending = false; buildCustomScreen(); return; }
@@ -498,5 +508,6 @@ void hidePrinterSettingsOverlays() {
   device_count = 0;
   page = Page::MAIN;
   open_pending = back_pending = scan_pending = false;
-  models_pending = sizes_pending = custom_pending = main_pending = false;
+  models_pending = sizes_pending = custom_pending = false;
+  save_pending = SaveAction::NONE;
 }

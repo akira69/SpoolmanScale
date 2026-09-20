@@ -121,14 +121,27 @@ std::vector<std::string> label_text;
 lv_obj_t* scr_connection=nullptr;
 LabelPrinterConfig saved={LabelPrinterModel::M220,"Old printer","aa:bb:cc:dd:ee:ff",40,30};
 int scan_calls=0, scan_result=24, loading_shown=0, loading_hidden=0, errors=0;
-bool overlay=false, save_ok=true;
+bool overlay=false, save_ok=true, in_callback=false, partial_failure=false;
+int save_calls=0, load_calls=0;
 const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model) {
   static const LabelPrinterProfile m220={LabelPrinterModel::M220,"M220",40,30,20,75,10,150,576,648,false};
   static const LabelPrinterProfile m110={LabelPrinterModel::M110,"M110",40,30,20,48,10,150,384,384,true};
   return model==LabelPrinterModel::M110 ? m110 : m220;
 }
-LabelPrinterConfig labelPrinterLoadConfig() { return saved; }
-bool labelPrinterSaveConfig(const LabelPrinterConfig& value) { if (!save_ok) return false; saved=value; return true; }
+LabelPrinterConfig labelPrinterLoadConfig() { ++load_calls; return saved; }
+bool labelPrinterSaveConfig(const LabelPrinterConfig& value) {
+  assert(!in_callback); // LVGL callbacks run while prefs writes only report queue acceptance.
+  ++save_calls;
+  if (partial_failure) {
+    saved.model=value.model;
+    strcpy(saved.address,value.address);
+    saved.media_width_mm=value.media_width_mm;
+    return false;
+  }
+  if (!save_ok) return false;
+  saved=value;
+  return true;
+}
 void loadingOverlayShow(const char*) { assert(!overlay); overlay=true; ++loading_shown; }
 void loadingOverlayHide() { assert(overlay); overlay=false; ++loading_hidden; }
 void loadingOverlayTick() { assert(overlay); }
@@ -157,7 +170,28 @@ String prefsGetString(const char* key) { return String(strstr(key,"addr") ? save
 bool prefsPutString(const char*,const char*) { return true; }
 size_t phomemoM220Scan(M220Device*,size_t) { return 0; }
 bool renderedText(const char* text) { for (const auto& s: label_text) if (s.find(text)!=std::string::npos) return true; return false; }
-void tap(lv_obj_t* o) { assert(o && o->active && o->cb); lv_event_t e; e.user_data=o->user_data; o->cb(&e); }
+void tap(lv_obj_t* o) {
+  assert(o && o->active && o->cb);
+  const int before=save_calls;
+  lv_event_t e; e.user_data=o->user_data;
+  in_callback=true; o->cb(&e); in_callback=false;
+  assert(save_calls==before);
+}
+std::vector<std::string> currentText() {
+  std::vector<std::string> result;
+  for (auto* o: objects) if (o->active) result.push_back(o->text);
+  return result;
+}
+void failedSaveKeepsScreen() {
+  const auto text=currentText();
+  const auto count=objects.size();
+  const int loads=load_calls, calls=save_calls, warnings=errors;
+  handlePrinterSettingsDeferredActions();
+  assert(save_calls==calls+1 && errors==warnings+1);
+  assert(load_calls==loads && objects.size()==count && currentText()==text);
+  handlePrinterSettingsDeferredActions();
+  assert(save_calls==calls+1 && load_calls==loads && currentText()==text);
+}
 lv_obj_t* button(int width,int height) { for (auto* o: objects) if (o->active && o->cb && o->width==width && o->height==height) return o; assert(false); return nullptr; }
 void tapModelButton() { tap(button(112,44)); }
 void selectModel(LabelPrinterModel model) { for (auto* o: objects) if (o->active && o->cb && o->user_data==reinterpret_cast<void*>(static_cast<intptr_t>(model))) { tap(o); return; } assert(false); }
@@ -182,25 +216,70 @@ int main() {
   tapScanButton(); handlePrinterSettingsDeferredActions();
   assert(scan_calls==1 && loading_shown==1 && loading_hidden==1);
   assert(renderedText("Q123456789") && renderedText("Unknown BLE device") && renderedText("Other 23"));
-  tapText("M220 hint");
+  tapText("M220 hint"); handlePrinterSettingsDeferredActions();
   assert(saved.model==LabelPrinterModel::M110 && !strcmp(saved.address,"11:22:33:44:55:02"));
-  save_ok=false; tapText("Q123456789"); assert(errors==1 && !strcmp(saved.address,"11:22:33:44:55:02"));
-  tapText("Clear"); assert(errors==2 && saved.address[0]);
-  save_ok=true; tapText("Unknown BLE device"); assert(!saved.name[0] && !strcmp(saved.address,"11:22:33:44:55:01"));
+  save_ok=false; tapText("Q123456789"); failedSaveKeepsScreen(); assert(errors==1 && !strcmp(saved.address,"11:22:33:44:55:02"));
+  tapText("Clear"); failedSaveKeepsScreen(); assert(errors==2 && saved.address[0]);
+  save_ok=true; tapText("Unknown BLE device"); handlePrinterSettingsDeferredActions(); assert(!saved.name[0] && !strcmp(saved.address,"11:22:33:44:55:01"));
   scan_result=0; label_text.clear(); tapScanButton(); handlePrinterSettingsDeferredActions();
   assert(loading_shown==2 && loading_hidden==2 && renderedText("No Bluetooth devices found"));
   tap(button(456,68)); handlePrinterSettingsDeferredActions();
   assert(!renderedText("50 x 25 mm") && renderedText("40 x 60 mm"));
-  save_ok=false; tapText("40 x 60 mm"); handlePrinterSettingsDeferredActions();
+  save_ok=false; tapText("40 x 60 mm"); failedSaveKeepsScreen();
   assert(saved.media_length_mm==30 && errors==3);
   save_ok=true; tapText("Custom"); handlePrinterSettingsDeferredActions();
   assert(renderedText("20-48 mm"));
   for (auto* o: objects) if (o->active && o->cb && o->x==370 && o->parent->y==62) for (int i=0;i<20;++i) tap(o);
-  tap(button(280,58)); handlePrinterSettingsDeferredActions(); assert(saved.media_width_mm==48);
+  save_ok=false; tap(button(280,58)); failedSaveKeepsScreen();
+  assert(saved.media_width_mm==40);
+  save_ok=true; tap(button(280,58)); handlePrinterSettingsDeferredActions(); assert(saved.media_width_mm==48);
   chooseModel(LabelPrinterModel::M220); assert(saved.media_width_mm==48);
-  save_ok=false; chooseModel(LabelPrinterModel::M110); assert(saved.model==LabelPrinterModel::M220 && errors==4);
-  back(); save_ok=true; tapText("Clear"); assert(!saved.name[0] && !saved.address[0] && saved.model==LabelPrinterModel::M220);
+  save_ok=false; tapModelButton(); handlePrinterSettingsDeferredActions();
+  selectModel(LabelPrinterModel::M110); failedSaveKeepsScreen();
+  assert(saved.model==LabelPrinterModel::M220 && errors==5);
+  back(); save_ok=true; tapText("Clear"); handlePrinterSettingsDeferredActions(); assert(!saved.name[0] && !saved.address[0] && saved.model==LabelPrinterModel::M220);
+  // A partial NVS write must not rebuild from mixed persisted values on failure or Back.
+  for (int path=0; path<5; ++path) {
+    hidePrinterSettingsOverlays();
+    saved={LabelPrinterModel::M220,"Old printer","aa:bb:cc:dd:ee:ff",50,25};
+    scan_result=24;
+    requestPrinterSettingsScreen(); handlePrinterSettingsDeferredActions();
+    const int loads=load_calls;
+    if (path==0) { tapScanButton(); handlePrinterSettingsDeferredActions(); tapText("Q123456789"); }
+    if (path==1) tapText("Clear");
+    if (path==2) { tapModelButton(); handlePrinterSettingsDeferredActions(); selectModel(LabelPrinterModel::M110); }
+    if (path>=3) {
+      tap(button(456,68)); handlePrinterSettingsDeferredActions();
+      if (path==3) tapText("40 x 60 mm");
+      else {
+        tapText("Custom"); handlePrinterSettingsDeferredActions();
+        for (auto* o: objects) if (o->active && o->cb && o->x==370 && o->parent->y==62) tap(o);
+        tap(button(280,58));
+      }
+    }
+    partial_failure=true;
+    failedSaveKeepsScreen();
+    partial_failure=false;
+    if (path>=2) back();
+    if (path==4) back();
+    assert(load_calls==loads);
+    bool old_name=false, old_size=false, old_model=false;
+    for (const auto& text: currentText()) {
+      old_name |= text=="Old printer";
+      old_size |= text=="50 x 25 mm";
+      old_model |= text=="M220";
+    }
+    assert(old_name && old_size && old_model);
+    // The next successful edit must be based on the last committed screen config.
+    tapText("Clear"); handlePrinterSettingsDeferredActions();
+    assert(saved.model==LabelPrinterModel::M220 && saved.media_width_mm==50 && saved.media_length_mm==25);
+    assert(!saved.name[0] && !saved.address[0]);
+  }
+  tapModelButton(); handlePrinterSettingsDeferredActions();
+  selectModel(LabelPrinterModel::M110);
+  const int calls=save_calls;
   hidePrinterSettingsOverlays(); handlePrinterSettingsDeferredActions();
+  assert(save_calls==calls); // Closing cancels queued settings writes.
 }
 '''
     result = subprocess.run(['g++', '-std=c++11', f'-I{tmp}', f'-I{root / "src"}', '-x', 'c++', '-', os.environ.get('PRINTER_SETTINGS_SOURCE', str(root / 'src/ui/printer_settings_screen.cpp')), '-o', str(tmp / 'check')], input=source, text=True, capture_output=True)
