@@ -11,9 +11,40 @@ parser_source = r'''
 #include "services/filaman_label_preset_parse.h"
 
 int main() {
-  FilaManLabelPreset presets[2];
+  FilaManLabelPreset presets[2]{};
   size_t count = 99;
-  assert(filamanParseLabelPresets("[{\"id\":7,\"name\":\"Saved\"},{\"id\":-1,\"name\":\"Bad\"}]", presets, 2, &count) < 0);
+  bool known = false;
+  assert(filamanParseLabelPresets(
+      "[{\"id\":7,\"name\":\"Saved\",\"selected\":true}]",
+      presets, 2, &count, &known) == 0);
+  assert(count == 1 && known && presets[0].selected);
+
+  known = true;
+  assert(filamanParseLabelPresets(
+      "[{\"id\":7,\"name\":\"Old server\"}]",
+      presets, 2, &count, &known) == 0);
+  assert(count == 1 && !known && !presets[0].selected);
+
+  assert(filamanParseLabelPresets(
+      "[{\"id\":7,\"name\":\"Default\",\"selected\":false}]",
+      presets, 2, &count, &known) == 0);
+  assert(count == 1 && known && !presets[0].selected);
+
+  known = true;
+  assert(filamanParseLabelPresets("[]", presets, 2, &count, &known) == 0);
+  assert(count == 0 && !known);
+
+  assert(filamanParseLabelPresets(
+      "[{\"id\":7,\"name\":\"One\",\"selected\":false},{\"id\":8,\"name\":\"Two\"}]",
+      presets, 2, &count, &known) < 0);
+  assert(count == 0 && !known);
+  assert(filamanParseLabelPresets(
+      "[{\"id\":7,\"name\":\"Bad\",\"selected\":\"false\"}]",
+      presets, 2, &count, &known) < 0);
+  assert(count == 0 && !known);
+  assert(filamanParseLabelPresets(
+      "[{\"id\":7,\"name\":\"Saved\",\"selected\":true},{\"id\":-1,\"name\":\"Bad\",\"selected\":false}]",
+      presets, 2, &count, &known) < 0);
   assert(count == 0);
 }
 '''

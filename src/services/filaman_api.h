@@ -15,7 +15,12 @@ int filamanRequestLabelPrint(const char* base_url, const char* api_key, int spoo
 // The list is either complete or rejected; it is never silently truncated.
 int filamanListLabelPresets(const char* base_url, const char* api_key,
                             FilaManLabelPreset* out, size_t capacity, size_t* count,
+                            bool* selection_known = nullptr,
                             uint32_t timeout_ms = 8000);
+
+// PUT /api/v1/me/label-presets/selection. Preset 0 selects Default.
+int filamanSelectLabelPreset(const char* base_url, const char* api_key,
+                             int preset_id, uint32_t timeout_ms = 8000);
 
 // ============================================================
 //  FILAMAN HTTP LAYER
@@ -340,7 +345,8 @@ int filamanGetSpoolListJson(const char* base_url, const char* api_key,
 // entire inventory to show a limited number of LVGL rows.
 int filamanGetSpoolPageJson(const char* base_url, const char* api_key,
                             int page, int page_size, JsonDocument& out_doc,
-                            int* out_total, uint32_t timeout_ms = 8000);
+                            int* out_total, const char* search_term = nullptr,
+                            uint32_t timeout_ms = 8000);
 
 // ---------- the device's own auto-assign settings ----------
 //

@@ -95,8 +95,9 @@ static float roundGrams(float g) {
 
 int filamanListLabelPresets(const char* base_url, const char* api_key,
                             FilaManLabelPreset* out, size_t capacity, size_t* count,
-                            uint32_t timeout_ms) {
+                            bool* selection_known, uint32_t timeout_ms) {
   if (count) *count = 0;
+  if (selection_known) *selection_known = false;
   if (!count || !out || capacity == 0 || capacity > FILAMAN_LABEL_PRESET_MAX ||
       !hasBaseUrl(base_url) || !api_key || !api_key[0]) return -1;
 
@@ -127,9 +128,28 @@ int filamanListLabelPresets(const char* base_url, const char* api_key,
   http.end();
   if (oversized) { free(body); return -2; }
 
-  const int parse_code = filamanParseLabelPresets(body, out, capacity, count);
+  const int parse_code = filamanParseLabelPresets(body, out, capacity, count,
+                                                  selection_known);
   free(body);
   return parse_code < 0 ? parse_code : code;
+}
+
+int filamanSelectLabelPreset(const char* base_url, const char* api_key,
+                             int preset_id, uint32_t timeout_ms) {
+  if (!hasBaseUrl(base_url) || !api_key || !api_key[0] || preset_id < 0) return -1;
+
+  String body = "{\"preset_id\":";
+  body += preset_id ? String(preset_id) : String("null");
+  body += "}";
+
+  HTTPClient http;
+  http.begin(String(base_url) + "/api/v1/me/label-presets/selection");
+  http.setTimeout(timeout_ms);
+  addApiKey(http, api_key);
+  http.addHeader("Content-Type", "application/json");
+  const int code = http.PUT(body);
+  http.end();
+  return code;
 }
 
 // ------------------------------------------------------------
@@ -1556,14 +1576,18 @@ int filamanGetSpoolListJson(const char* base_url, const char* api_key,
 
 int filamanGetSpoolPageJson(const char* base_url, const char* api_key,
                             int page, int page_size, JsonDocument& out_doc,
-                            int* out_total, uint32_t timeout_ms) {
+                            int* out_total, const char* search_term,
+                            uint32_t timeout_ms) {
   if (out_total) *out_total = 0;
   out_doc.clear();
   if (!hasBaseUrl(base_url) || page < 1 || page_size < 1 || page_size > FILAMAN_PAGE_MAX)
     return -1;
 
   HTTPClient http;
-  http.begin(String(base_url) + "/api/v1/spools?page=" + page + "&page_size=" + page_size);
+  String url = String(base_url) + "/api/v1/spools?page=" + page + "&page_size=" + page_size +
+               "&sort_by=id&sort_order=desc";
+  if (search_term && search_term[0]) url += String("&search=") + urlEncodeQuery(search_term);
+  http.begin(url);
   http.setTimeout(timeout_ms);
   addApiKey(http, api_key);
   int code = http.GET();
