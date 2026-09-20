@@ -190,7 +190,7 @@ void buildPresetScreen() {
 
   lv_obj_t* refresh = lv_btn_create(screen);
   lv_obj_set_size(refresh, 100, 34);
-  lv_obj_set_pos(refresh, 368, 8);
+  lv_obj_set_pos(refresh, 320, 8);
   styleOutlineButton(refresh);
   lv_obj_add_event_cb(refresh, [](lv_event_t*) { fetch_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* refresh_label = lv_label_create(refresh);
@@ -199,6 +199,7 @@ void buildPresetScreen() {
   lv_obj_center(refresh_label);
 
   status = lv_label_create(screen);
+  lv_label_set_text(status, "");
   lv_obj_set_width(status, 440);
   lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_color(status, lv_color_hex(0xb7c9dc), 0);
@@ -245,7 +246,7 @@ bool drawPreview() {
   lv_obj_add_event_cb(canvas, [](lv_event_t* e) {
     free(lv_event_get_user_data(e));
   }, LV_EVENT_DELETE, thumbnail);
-  lv_obj_set_pos(canvas, (480 - target_width) / 2, 82 + (160 - target_height) / 2);
+  lv_obj_set_pos(canvas, (480 - target_width) / 2, 92 + (160 - target_height) / 2);
   return true;
 }
 
@@ -302,25 +303,32 @@ void buildPreviewScreen() {
   buildSubHeader(screen, T(STR_LABEL_PREVIEW), [](lv_event_t*) { back_pending = true; });
 
   lv_obj_t* change = lv_btn_create(screen);
-  lv_obj_set_size(change, 126, 34);
-  lv_obj_set_pos(change, 342, 8);
+  lv_obj_set_size(change, 140, 44);
+  lv_obj_set_pos(change, 325, 268);
   styleOutlineButton(change);
+  lv_obj_set_style_pad_all(change, 4, 0);
   lv_obj_add_event_cb(change, [](lv_event_t*) { change_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* change_label = lv_label_create(change);
   lv_label_set_text(change_label, T(STR_LABEL_CHANGE_PRESET));
   lv_obj_set_style_text_color(change_label, lv_color_hex(UI_COL_INK_2), 0);
+  lv_obj_set_style_text_font(change_label, UI_FONT_SMALL, 0);
   lv_obj_center(change_label);
 
   status = lv_label_create(screen);
+  lv_label_set_text(status, "");
   lv_obj_set_width(status, 440);
   lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_color(status, lv_color_hex(0xb7c9dc), 0);
-  lv_obj_set_pos(status, 20, 54);
+  lv_obj_set_style_text_color(status, lv_color_hex(UI_COL_INK_2), 0);
+  lv_obj_set_pos(status, 20, 50);
+  lv_obj_set_height(status, 40);
+  lv_obj_set_style_text_font(status, UI_FONT_BODY, 0);
+  lv_label_set_long_mode(status, LV_LABEL_LONG_DOT);
 
   pc_button = lv_btn_create(screen);
-  lv_obj_set_size(pc_button, 180, 38);
-  lv_obj_set_pos(pc_button, 45, 261);
+  lv_obj_set_size(pc_button, 140, 44);
+  lv_obj_set_pos(pc_button, 15, 268);
   styleOutlineButton(pc_button);
+  lv_obj_set_style_pad_all(pc_button, 4, 0);
   lv_obj_add_event_cb(pc_button, [](lv_event_t*) {
     if (preview.pixels && pc_request.request(spool_id, prefsGetInt("label_preset", 0)))
       setStatus(T(STR_LABEL_PC_PENDING));
@@ -328,19 +336,22 @@ void buildPreviewScreen() {
   lv_obj_t* pc_label = lv_label_create(pc_button);
   lv_label_set_text(pc_label, T(STR_LABEL_PC_OPEN));
   lv_obj_set_style_text_color(pc_label, lv_color_hex(UI_COL_INK_2), 0);
+  lv_obj_set_style_text_font(pc_label, UI_FONT_SMALL, 0);
   lv_obj_center(pc_label);
   lv_obj_add_state(pc_button, LV_STATE_DISABLED);
 
   printer_button = lv_btn_create(screen);
-  lv_obj_set_size(printer_button, 180, 38);
-  lv_obj_set_pos(printer_button, 255, 261);
+  lv_obj_set_size(printer_button, 140, 44);
+  lv_obj_set_pos(printer_button, 170, 268);
   styleOutlineButton(printer_button);
+  lv_obj_set_style_pad_all(printer_button, 4, 0);
   lv_obj_add_event_cb(printer_button, [](lv_event_t*) {
     if (preview.pixels) print_pending = true;
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* printer_label = lv_label_create(printer_button);
   lv_label_set_text(printer_label, T(STR_LABEL_PRINTER_PRINT));
   lv_obj_set_style_text_color(printer_label, lv_color_hex(UI_COL_INK_2), 0);
+  lv_obj_set_style_text_font(printer_label, UI_FONT_SMALL, 0);
   lv_obj_center(printer_label);
   lv_obj_add_state(printer_button, LV_STATE_DISABLED);
 
