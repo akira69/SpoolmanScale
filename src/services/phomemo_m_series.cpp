@@ -1,5 +1,6 @@
+#include "services/phomemo_m_series.h"
 #include "services/phomemo_m220.h"
-#include "services/phomemo_m220_protocol.h"
+#include "services/phomemo_m_series_protocol.h"
 
 #include <Arduino.h>
 #include <BLEDevice.h>
@@ -60,57 +61,58 @@ bool connectEventComplete(uint8_t expected) {
   return false;
 }
 
-class M220ScanCollector : public BLEAdvertisedDeviceCallbacks {
+class MSeriesScanCollector : public BLEAdvertisedDeviceCallbacks {
  public:
-  M220ScanCollector(M220Device* devices, size_t max_devices)
-      : out(devices), capacity(max_devices) {}
+  MSeriesScanCollector(LabelPrinterDevice* devices, size_t max_devices,
+                       const LabelPrinterConfig& config)
+      : out(devices), capacity(max_devices), selected(config) {}
 
   void onResult(BLEAdvertisedDevice device) override {
-    const std::string name = device.getName();
-    // M-series printers can advertise their Q-prefixed serial instead of M220.
-    if (name.find("M220") == std::string::npos &&
-        !(name.size() >= 10 && name[0] == 'Q')) return;
-    const std::string address = device.getAddress().toString();
-    for (size_t i = 0; i < count; ++i)
-      if (strcmp(out[i].address, address.c_str()) == 0) return;
-    if (count >= capacity) return;
-    snprintf(out[count].name, sizeof(out[count].name), "%s", name.c_str());
-    snprintf(out[count].address, sizeof(out[count].address), "%s", address.c_str());
-    ++count;
+    LabelPrinterDevice candidate{};
+    snprintf(candidate.name, sizeof(candidate.name), "%s", device.getName().c_str());
+    snprintf(candidate.address, sizeof(candidate.address), "%s", device.getAddress().toString().c_str());
+    labelPrinterConsiderDevice(out, &count, capacity, candidate, selected);
   }
 
   size_t count = 0;
 
  private:
-  M220Device* out;
+  LabelPrinterDevice* out;
   size_t capacity;
+  const LabelPrinterConfig& selected;
 };
 }
 
-size_t phomemoM220Scan(M220Device* out, size_t capacity) {
+size_t phomemoMSeriesScan(LabelPrinterDevice* out, size_t capacity,
+                        const LabelPrinterConfig& selected, LabelPrinterProgressFn progress) {
   BLEDevice::init("");
   BLEScan* scan = BLEDevice::getScan();
   scan->setActiveScan(true);
   scan->clearResults();
-  M220ScanCollector collector(out, capacity);
+  MSeriesScanCollector collector(out, capacity, selected);
   // With duplicate filtering the library keeps the first packet for each
   // address and drops later scan responses, which may carry the printer name.
   scan->setAdvertisedDeviceCallbacks(&collector, true);
-  scan->start(8, false);
+  for (unsigned interval = 0; interval < 8; ++interval) {
+    scan->start(1, false);
+    if (progress) progress();
+  }
   scan->setAdvertisedDeviceCallbacks(nullptr);
   scan->clearResults();
   return collector.count;
 }
 
-bool phomemoM220Print(const char* address, const LabelRaster& image,
-                     char* error, size_t error_size) {
-  auto fail = [&](const char* message) { if (error_size) snprintf(error, error_size, "%s", message); return false; };
+bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const LabelRaster& image,
+                        char* error, size_t error_size, LabelPrinterProgressFn progress) {
+  const LabelPrinterProfile& profile = labelPrinterProfile(model);
+  auto fail = [&](const char* message) { if (error_size) snprintf(error, error_size, "%s: %s", profile.name ? profile.name : "Printer", message); return false; };
   if (error_size) error[0] = 0;
-  if (!address || !*address) return fail("Select an M220 printer first.");
+  if (profile.model == LabelPrinterModel::NONE) return fail("Select a printer model first.");
+  if (!address || !*address) return fail("Select a printer first.");
   if (!labelRasterPaddingValid(image)) return fail("Invalid label image.");
-  if (image.width > M220_MAX_RASTER_WIDTH) return fail("M220 width exceeds print head.");
-  if (s_client_unresolved) return fail("M220 BLE cleanup pending. Restart scale before retrying.");
-  Serial.printf("M220 before client: heap=%u largest=%u psram=%u\n",
+  if (image.width > profile.max_raster_width) return fail("width exceeds print head.");
+  if (s_client_unresolved) return fail("BLE cleanup pending. Restart scale before retrying.");
+  Serial.printf("%s before client: heap=%u largest=%u psram=%u\n", profile.name,
                 unsigned(ESP.getFreeHeap()),
                 unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
                 unsigned(ESP.getFreePsram()));
@@ -118,7 +120,7 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
   if (!s_connect_events) s_connect_events = xQueueCreate(2, sizeof(uint8_t));
-  if (!s_disconnect_events || !s_connect_events) { delete client; return fail("M220 BLE queue unavailable."); }
+  if (!s_disconnect_events || !s_connect_events) { delete client; return fail("BLE queue unavailable."); }
   xQueueReset(s_disconnect_events);
   xQueueReset(s_connect_events);
   s_gatt_if = ESP_GATT_IF_NONE;
@@ -137,7 +139,7 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
       const uint8_t expected = client->getConnId() != ESP_GATT_IF_NONE
           ? ESP_GATTC_OPEN_EVT : ESP_GATTC_REG_EVT;
       connect_completed = connectEventComplete(expected);
-      fail("Could not connect to M220.");
+      fail("Could not connect to printer.");
       break;
     }
     connected = true;
@@ -146,14 +148,14 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     BLERemoteService* service = client->getService(BLEUUID((uint16_t)0xff00));
     BLERemoteCharacteristic* write = service ? service->getCharacteristic(BLEUUID((uint16_t)0xff02)) : nullptr;
     if (!write || (!write->canWrite() && !write->canWriteNoResponse())) {
-      fail("M220 write characteristic missing."); break;
+      fail("write characteristic missing."); break;
     }
     if (!s_write_events) s_write_events = xQueueCreate(1, sizeof(esp_gatt_status_t));
-    if (!s_write_events) { fail("M220 write queue unavailable."); break; }
+    if (!s_write_events) { fail("write queue unavailable."); break; }
     s_write_handle = write->getHandle();
-    const size_t chunk = m220WriteChunk(client->getMTU());
+    const size_t chunk = phomemoWriteChunk(client->getMTU());
     const bool response = write->canWrite();
-    Serial.printf("M220 BLE connected: MTU=%u chunk=%u response=%u raster=%ux%u (%u bytes) heap=%u largest=%u psram=%u\n",
+    Serial.printf("%s BLE connected: MTU=%u chunk=%u response=%u raster=%ux%u (%u bytes) heap=%u largest=%u psram=%u\n", profile.name,
                   client->getMTU(), unsigned(chunk), unsigned(response),
                   unsigned(image.width), unsigned(image.height), unsigned(image.length),
                   unsigned(ESP.getFreeHeap()),
@@ -162,7 +164,7 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     auto send = [&](const char* stage, const uint8_t* data, size_t length) {
       for (size_t pos = 0; pos < length; pos += chunk) {
         if (!client->isConnected()) {
-          Serial.printf("M220 %s disconnected at %u/%u\n", stage, unsigned(pos), unsigned(length));
+          Serial.printf("%s %s disconnected at %u/%u\n", profile.name, stage, unsigned(pos), unsigned(length));
           return false;
         }
         xQueueReset(s_write_events);
@@ -172,38 +174,54 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
             response ? ESP_GATT_WRITE_TYPE_RSP : ESP_GATT_WRITE_TYPE_NO_RSP,
             ESP_GATT_AUTH_REQ_NONE);
         if (result != ESP_OK) {
-          Serial.printf("M220 %s enqueue failed at %u/%u: %d\n", stage, unsigned(pos), unsigned(length), int(result));
+          Serial.printf("%s %s enqueue failed at %u/%u: %d\n", profile.name, stage, unsigned(pos), unsigned(length), int(result));
           return false;
         }
         esp_gatt_status_t status;
         if (xQueueReceive(s_write_events, &status, pdMS_TO_TICKS(3000)) != pdTRUE) {
-          Serial.printf("M220 %s write timeout at %u/%u, connected=%u\n", stage, unsigned(pos), unsigned(length), unsigned(client->isConnected()));
+          Serial.printf("%s %s write timeout at %u/%u, connected=%u\n", profile.name, stage, unsigned(pos), unsigned(length), unsigned(client->isConnected()));
           return false;
         }
         if (status != ESP_GATT_OK) {
-          Serial.printf("M220 %s GATT status %d at %u/%u\n", stage, int(status), unsigned(pos), unsigned(length));
+          Serial.printf("%s %s GATT status %d at %u/%u\n", profile.name, stage, int(status), unsigned(pos), unsigned(length));
           return false;
         }
         if (!client->isConnected()) {
-          Serial.printf("M220 %s disconnected after %u/%u\n", stage, unsigned(pos), unsigned(length));
+          Serial.printf("%s %s disconnected after %u/%u\n", profile.name, stage, unsigned(pos), unsigned(length));
           return false;
         }
         delay(20);
+        if (progress) progress();
         if (!strcmp(stage, "raster") && pos && pos % 4096 < chunk)
-          Serial.printf("M220 raster %u/%u heap=%u\n", unsigned(pos), unsigned(length), unsigned(ESP.getFreeHeap()));
+          Serial.printf("%s raster %u/%u heap=%u\n", profile.name, unsigned(pos), unsigned(length), unsigned(ESP.getFreeHeap()));
       }
-      Serial.printf("M220 %s sent %u bytes, heap=%u largest=%u\n", stage, unsigned(length),
+      Serial.printf("%s %s sent %u bytes, heap=%u largest=%u\n", profile.name, stage, unsigned(length),
                     unsigned(ESP.getFreeHeap()),
                     unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
       return true;
     };
-    const uint8_t init[] = {0x1b, 0x40};
-    const uint8_t density[] = {0x1b, 0x37, 0x07, 0x64, 0x64};
-    const auto header = m220RasterHeader(image.width, image.height);
-    const uint8_t feed[] = {0x1b, 0x4a, 0x20};
-    if (!send("init", init, sizeof(init)) || !send("density", density, sizeof(density)) ||
-        !send("header", header.data(), header.size()) || !send("raster", image.pixels, image.length) ||
-        !send("feed", feed, sizeof(feed))) { fail("M220 write failed or disconnected."); break; }
+    const auto header = phomemoRasterHeader(image.width, image.height);
+    if (model == LabelPrinterModel::M220) {
+      const uint8_t init[] = {0x1b, 0x40};
+      const uint8_t density[] = {0x1b, 0x37, 0x07, 0x64, 0x64};
+      const uint8_t feed[] = {0x1b, 0x4a, 0x20};
+      if (!send("init", init, sizeof(init)) || !send("density", density, sizeof(density)) ||
+          !send("header", header.data(), header.size()) || !send("raster", image.pixels, image.length) ||
+          !send("feed", feed, sizeof(feed))) { fail("write failed or disconnected."); break; }
+    } else {
+      const auto speed = m110SpeedCommand(5);
+      const auto density = m110DensityCommand(10);
+      const auto media = m110MediaCommand(0x0a);
+      const auto footer_start = m110FooterStart();
+      const auto footer_end = m110FooterEnd();
+      if (!send("speed", speed.data(), speed.size()) || !send("density", density.data(), density.size()) ||
+          !send("media", media.data(), media.size()) || !send("header", header.data(), header.size()) ||
+          !send("raster", image.pixels, image.length) ||
+          !send("footer start", footer_start.data(), footer_start.size()) ||
+          !send("footer end", footer_end.data(), footer_end.size())) {
+        fail("write failed or disconnected."); break;
+      }
+    }
     ok = true;
   } while (false);
   if (client->isConnected()) client->disconnect();
@@ -219,8 +237,18 @@ bool phomemoM220Print(const char* address, const LabelRaster& image,
     // callback could otherwise use freed memory.
     s_client_unresolved = true;
     if (!connected) return false;
-    return fail("M220 disconnect timed out. Restart scale before retrying.");
+    return fail("disconnect timed out. Restart scale before retrying.");
   }
   delete client;
   return ok;
+}
+
+// Temporary adapters until the settings and print screens use the facade.
+size_t phomemoM220Scan(M220Device* out, size_t capacity) {
+  return labelPrinterScan(labelPrinterLoadConfig(), out, capacity);
+}
+
+bool phomemoM220Print(const char* address, const LabelRaster& image,
+                     char* error, size_t error_size) {
+  return phomemoMSeriesPrint(LabelPrinterModel::M220, address, image, error, error_size);
 }

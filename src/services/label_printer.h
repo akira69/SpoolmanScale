@@ -27,6 +27,13 @@ struct LabelPrinterConfig {
 struct LabelPrinterDevice { char name[32]; char address[18]; };
 using LabelPrinterProgressFn = void (*)();
 
+size_t labelPrinterScan(const LabelPrinterConfig& selected,
+                       LabelPrinterDevice* out, size_t capacity,
+                       LabelPrinterProgressFn progress = nullptr);
+bool labelPrinterPrint(const LabelPrinterConfig& config, const LabelRaster& image,
+                       char* error, size_t error_size,
+                       LabelPrinterProgressFn progress = nullptr);
+
 const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model);
 LabelPrinterConfig labelPrinterLoadConfig();
 bool labelPrinterSaveConfig(const LabelPrinterConfig& config);

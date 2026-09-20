@@ -1,9 +1,11 @@
 #include "services/label_printer.h"
 
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "services/prefs_store.h"
+#include "services/phomemo_m_series.h"
 
 namespace {
 static const LabelPrinterProfile kNone = {};
@@ -98,6 +100,34 @@ bool labelPrinterConfigured(const LabelPrinterConfig& config) {
   return config.address[0] != '\0';
 }
 
+size_t labelPrinterScan(const LabelPrinterConfig& selected,
+                       LabelPrinterDevice* out, size_t capacity,
+                       LabelPrinterProgressFn progress) {
+  const size_t count = phomemoMSeriesScan(out, capacity, selected, progress);
+  labelPrinterSortDevices(out, count, selected);
+  return count;
+}
+
+bool labelPrinterPrint(const LabelPrinterConfig& config, const LabelRaster& image,
+                       char* error, size_t error_size, LabelPrinterProgressFn progress) {
+  if (error_size) error[0] = 0;
+  const LabelPrinterProfile& profile = labelPrinterProfile(config.model);
+  const char* message = nullptr;
+  if (profile.model == LabelPrinterModel::NONE || !labelPrinterConfigured(config))
+    message = "Select a label printer first.";
+  else if (!labelRasterPaddingValid(image))
+    message = "Invalid label image.";
+  else if (image.width > profile.max_raster_width)
+    message = "Label width exceeds print head.";
+  else if (!labelPrinterRasterFits(config.model, image, config.media_width_mm, config.media_length_mm))
+    message = "Label does not fit loaded media.";
+  if (message) {
+    if (error_size) snprintf(error, error_size, "%s", message);
+    return false;
+  }
+  return phomemoMSeriesPrint(config.model, config.address, image, error, error_size, progress);
+}
+
 uint16_t labelPrinterDotsForMm(uint16_t mm) {
   return (uint32_t(mm) * 2030 + 127) / 254;
 }
@@ -151,15 +181,22 @@ void labelPrinterConsiderDevice(LabelPrinterDevice* devices, size_t* count,
                                 const LabelPrinterConfig& selected) {
   if (!devices || !count || !capacity) return;
   for (size_t i = 0; i < *count; ++i)
-    if (!strcmp(devices[i].address, candidate.address)) return;
+    if (!strcmp(devices[i].address, candidate.address)) {
+      if (!devices[i].name[0] && candidate.name[0]) devices[i] = candidate;
+      return;
+    }
   if (*count < capacity) {
     devices[(*count)++] = candidate;
-    labelPrinterSortDevices(devices, *count, selected);
     return;
   }
+  // Evict the latest worst-priority entry so equal-priority arrivals stay stable.
+  size_t worst = 0;
+  for (size_t i = 1; i < *count; ++i)
+    if (labelPrinterDevicePriority(devices[i], selected) >=
+        labelPrinterDevicePriority(devices[worst], selected)) worst = i;
   if (labelPrinterDevicePriority(candidate, selected) <
-      labelPrinterDevicePriority(devices[*count - 1], selected)) {
+      labelPrinterDevicePriority(devices[worst], selected)) {
+    for (size_t i = worst + 1; i < *count; ++i) devices[i - 1] = devices[i];
     devices[*count - 1] = candidate;
-    labelPrinterSortDevices(devices, *count, selected);
   }
 }

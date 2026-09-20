@@ -1,9 +1,9 @@
 #pragma once
 
 #include <stddef.h>
-#include "services/label_raster.h"
+#include "services/label_printer.h"
 
-struct M220Device { char name[32]; char address[18]; };
+using M220Device = LabelPrinterDevice;
 
 constexpr uint16_t M220_DEFAULT_MEDIA_WIDTH_MM = 40;
 constexpr uint16_t M220_DEFAULT_MEDIA_LENGTH_MM = 30;

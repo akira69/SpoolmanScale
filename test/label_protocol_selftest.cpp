@@ -1,14 +1,24 @@
-#include "services/label_raster.h"
+#include "services/label_printer.h"
 #include "services/phomemo_m220.h"
-#include "services/phomemo_m220_protocol.h"
+#include "services/phomemo_m_series_protocol.h"
 #include <array>
 #include <cassert>
 
 int main() {
-  const std::array<uint8_t, 8> expected = {0x1d, 0x76, 0x30, 0x00, 0x48, 0x00, 0x90, 0x01};
-  assert(m220RasterHeader(576, 400) == expected);
-  assert(m220WriteChunk(23) == 20);
-  assert(m220WriteChunk(247) == 128);
+  const std::array<uint8_t, 8> m220_header = {0x1d, 0x76, 0x30, 0x00, 0x48, 0x00, 0x90, 0x01};
+  assert(phomemoRasterHeader(576, 400) == m220_header);
+  assert(phomemoWriteChunk(23) == 20);
+  assert(phomemoWriteChunk(247) == 128);
+  assert(m110SpeedCommand(5) ==
+         (std::array<uint8_t, 4>{0x1b, 0x4e, 0x0d, 0x05}));
+  assert(m110DensityCommand(10) ==
+         (std::array<uint8_t, 4>{0x1b, 0x4e, 0x04, 0x0a}));
+  assert(m110MediaCommand(0x0a) ==
+         (std::array<uint8_t, 3>{0x1f, 0x11, 0x0a}));
+  assert(m110FooterStart() ==
+         (std::array<uint8_t, 4>{0x1f, 0xf0, 0x05, 0x00}));
+  assert(m110FooterEnd() ==
+         (std::array<uint8_t, 4>{0x1f, 0xf0, 0x03, 0x00}));
   assert(labelRasterShapeValid(480, 320, 60, 19200));
   assert(!labelRasterShapeValid(480, 320, 60, 19199));
   assert(!labelRasterShapeValid(480, 320, 61, 19520));
