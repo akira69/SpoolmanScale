@@ -26,6 +26,7 @@ with tempfile.TemporaryDirectory() as tmp:
     header('services/http_progress.h', '#include <stddef.h>\nextern bool progress_active; struct HttpStallTime {}; struct HttpStall { explicit HttpStall(void (*)(size_t)) { progress_active=true; } ~HttpStall() { progress_active=false; } };\n')
     header('services/wifi_manager.h', 'bool wifiManagerIsConnected();\n')
     header('ui/loading_overlay.h', 'void loadingOverlayShow(const char*); void loadingOverlayHide(); void loadingOverlayProgress(size_t);\n')
+    header('ui/header_status.h', 'void updateHeaderStatus();\n')
     header('ui/more_info_screen.h', 'void showMoreInfoScreen();\n')
     header('ui/navigation.h', 'void hideAllOverlays(); void showMainScreen();\n')
     header('ui/spoolman_lookup.h', 'bool querySpoolmanById(int);\n')
@@ -39,7 +40,7 @@ with tempfile.TemporaryDirectory() as tmp:
 #include "ui/main_screen_helpers.h"
 std::vector<lv_obj_t*> objects;
 bool wifi=true, tag_present=false, sm_found=false, lookup_ok=true, progress_active=false;
-int sm_id=0, spool_list_limit=20, response=200, pages=0, lookups=0, opened=0, adoption_resets=0;
+int sm_id=0, spool_list_limit=20, response=200, pages=0, lookups=0, opened=0, adoption_resets=0, header_updates=0;
 int loading_depth=0, loading_shown=0, loading_hidden=0;
 const char* T(int) { return "text"; }
 bool backendIsFilaMan() { return true; }
@@ -57,6 +58,7 @@ bool querySpoolmanById(int id) { assert(adoption_resets==lookups+1); assert(load
 void clearTagDisplay() { sm_found=false; }
 void cancelPendingNfcClear() {}
 void cancelRemoteTaglessAdoption() { ++adoption_resets; }
+void updateHeaderStatus() { assert(sm_found && sm_id>0); ++header_updates; }
 void hideAllOverlays() { hideManualSpoolOverlays(); }
 void showMainScreen() {}
 void releaseScreen(lv_obj_t** p) { *p=nullptr; }
@@ -74,10 +76,10 @@ int main() {
   assert(!spoolResolvedForActions(true,0));
   requestManualSpoolScreen(); handleManualSpoolDeferredActions(); balanced(0);
   int before=loading_shown;
-  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==1 && adoption_resets==1);
+  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==1 && adoption_resets==1 && header_updates==1);
   requestManualSpoolScreen(); handleManualSpoolDeferredActions();
   before=loading_shown; lookup_ok=false;
-  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==2 && adoption_resets==2);
+  select(); handleManualSpoolDeferredActions(); balanced(before); assert(opened==1 && lookups==2 && adoption_resets==2 && header_updates==1);
   before=loading_shown; tag_present=true;
   select(); handleManualSpoolDeferredActions(); assert(loading_shown==before && lookups==2);
   tag_present=false; wifi=false;

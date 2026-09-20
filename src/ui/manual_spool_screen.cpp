@@ -15,6 +15,7 @@
 #include "services/http_progress.h"
 #include "services/wifi_manager.h"
 #include "ui/more_info_screen.h"
+#include "ui/header_status.h"
 #include "ui/loading_overlay.h"
 #include "ui/navigation.h"
 #include "ui/spoolman_lookup.h"
@@ -181,6 +182,7 @@ void handleManualSpoolDeferredActions() {
     loadingOverlayHide();
     if (found) {
       cancelPendingNfcClear();
+      updateHeaderStatus();
       // This runs from the app loop, outside LVGL's event callback. Free the
       // list now so More info can use its LVGL pool memory immediately.
       lv_obj_del(screen);
