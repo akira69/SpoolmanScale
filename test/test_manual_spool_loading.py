@@ -266,6 +266,9 @@ int main() {
   tap(420,52,50,44); handleManualSpoolDeferredActions();
   assert(requested_pages.back()==3 && requested_searches.back()=="#123 & blue");
 
+  tap(10,52,50,44); handleManualSpoolDeferredActions();
+  assert(requested_pages.back()==2 && requested_searches.back()=="#123 & blue");
+
   tap(290,52,120,44);  // clear
   handleManualSpoolDeferredActions();
   assert(requested_pages.back()==1 && requested_searches.back()=="");
