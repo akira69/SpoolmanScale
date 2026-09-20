@@ -65,7 +65,8 @@ static const int lv_font_montserrat_ext_20=0;
     header('ui/navigation.h', 'void hideAllOverlays();\n')
     header('ui/more_info_screen.h', 'void showMoreInfoScreen();\n')
     header('ui/label_preset_selection.h', '#include <lvgl.h>\nvoid labelPresetRowCb(lv_event_t*);\n')
-    header('ui/ui_common.h', '#include <lvgl.h>\nvoid releaseScreen(lv_obj_t**);\n')
+    header('ui/printer_settings_screen.h', 'void requestPrinterSettingsScreen();\n')
+    header('ui/ui_common.h', '#include <lvgl.h>\nvoid releaseScreen(lv_obj_t**); inline bool lvPoolHasRoomForRow() { return true; } inline void styleOutlineButton(lv_obj_t*) {} inline void styleListPanel(lv_obj_t*) {} inline void styleListRow(lv_obj_t*, bool = false) {} inline lv_obj_t* buildOverlayScreen() { return lv_obj_create(nullptr); } inline void buildSubHeader(lv_obj_t* p,const char*,lv_event_cb_t cb,const char* = nullptr) { auto* b=lv_btn_create(p); lv_obj_set_pos(b,12,8); lv_obj_add_event_cb(b,cb,LV_EVENT_CLICKED,nullptr); }\n')
     source = r'''
 #include <assert.h>
 #include <Arduino.h>

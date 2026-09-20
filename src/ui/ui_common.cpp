@@ -40,12 +40,32 @@ bool uiModalWaiting() {
 }
 
 void styleOutlineButton(lv_obj_t *button) {
-  lv_obj_set_style_bg_color(button, lv_color_hex(0x0a1828), 0);
-  lv_obj_set_style_bg_color(button, lv_color_hex(0x1a3050), LV_STATE_PRESSED);
-  lv_obj_set_style_border_color(button, lv_color_hex(0x28d49a), 0);
+  lv_obj_set_style_bg_color(button, lv_color_hex(UI_COL_SURFACE_2), 0);
+  lv_obj_set_style_bg_color(button, lv_color_hex(UI_COL_ROW_PRESSED), LV_STATE_PRESSED);
+  lv_obj_set_style_border_color(button, lv_color_hex(UI_COL_LINE), 0);
   lv_obj_set_style_border_width(button, 1, 0);
-  lv_obj_set_style_radius(button, 8, 0);
+  lv_obj_set_style_radius(button, UI_RADIUS_BTN, 0);
   lv_obj_set_style_shadow_width(button, 0, 0);
+  lv_obj_set_style_text_color(button, lv_color_hex(UI_COL_INK_2), 0);
+}
+
+void styleListPanel(lv_obj_t *panel) {
+  lv_obj_set_style_bg_color(panel, lv_color_hex(UI_COL_GROUND), 0);
+  lv_obj_set_style_border_color(panel, lv_color_hex(UI_COL_LINE), 0);
+  lv_obj_set_style_border_width(panel, 1, 0);
+  lv_obj_set_style_radius(panel, UI_RADIUS_BTN, 0);
+  lv_obj_set_style_shadow_width(panel, 0, 0);
+  lv_obj_set_style_text_color(panel, lv_color_hex(UI_COL_INK_2), 0);
+}
+
+void styleListRow(lv_obj_t *row, bool selected) {
+  lv_obj_set_style_bg_color(row, lv_color_hex(selected ? UI_COL_ACCENT_DIM : UI_COL_SURFACE_2), 0);
+  lv_obj_set_style_bg_color(row, lv_color_hex(UI_COL_ROW_PRESSED), LV_STATE_PRESSED);
+  lv_obj_set_style_border_color(row, lv_color_hex(selected ? UI_COL_ACCENT : UI_COL_LINE_SOFT), 0);
+  lv_obj_set_style_border_width(row, 1, 0);
+  lv_obj_set_style_radius(row, UI_RADIUS_INPUT, 0);
+  lv_obj_set_style_shadow_width(row, 0, 0);
+  lv_obj_set_style_text_color(row, lv_color_hex(selected ? UI_COL_ACCENT : UI_COL_INK_2), 0);
 }
 
 // The hue a swatch is drawn in: its own, or glass for a filament that names

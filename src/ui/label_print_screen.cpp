@@ -57,10 +57,10 @@ void setHttpError(const char* message, int code) {
 
 void addPresetRow(int id, const char* name) {
   if (!lvPoolHasRoomForRow()) return;
+  const bool selected = id == prefsGetInt("label_preset", 0);
   lv_obj_t* row = lv_btn_create(list);
   lv_obj_set_size(row, 392, 42);
-  lv_obj_set_style_bg_color(row, lv_color_hex(id == prefsGetInt("label_preset", 0) ? 0x174f46 : 0x102035), 0);
-  lv_obj_set_style_radius(row, 6, 0);
+  styleListRow(row, selected);
   lv_obj_add_event_cb(row, labelPresetRowCb, LV_EVENT_CLICKED, (void*)(intptr_t)id);
   lv_obj_t* label = lv_label_create(row);
   if (id) lv_label_set_text_fmt(label, "#%d  %s", id, name);
@@ -88,8 +88,7 @@ void fillPresetList() {
       if (!count || !lvPoolHasRoomForRow()) continue;
       lv_obj_t* row = lv_btn_create(list);
       lv_obj_set_size(row, 392, 42);
-      lv_obj_set_style_bg_color(row, lv_color_hex(0x102035), 0);
-      lv_obj_set_style_radius(row, 6, 0);
+      styleListRow(row);
       lv_obj_add_event_cb(row, [](lv_event_t* e) {
         preset_group = (int)(intptr_t)lv_event_get_user_data(e);
         preset_page_index = 0;
@@ -193,7 +192,7 @@ void buildPresetScreen() {
   lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_all(list, 8, 0);
   lv_obj_set_style_pad_row(list, 6, 0);
-  lv_obj_set_style_bg_color(list, lv_color_hex(0x09111e), 0);
+  styleListPanel(list);
   fillPresetList();
   fetch_pending = true;
   lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);

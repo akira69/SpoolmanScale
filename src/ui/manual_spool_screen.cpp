@@ -92,7 +92,7 @@ void buildScreen() {
   lv_obj_set_scroll_dir(list, LV_DIR_VER);
   lv_obj_set_style_pad_all(list, 4, 0);
   lv_obj_set_style_pad_row(list, 4, 0);
-  lv_obj_set_style_bg_color(list, lv_color_hex(0x0a1020), 0);
+  styleListPanel(list);
   page = 1;
   fetch_pending = true;
   lv_obj_clear_flag(screen, LV_OBJ_FLAG_HIDDEN);
@@ -128,8 +128,7 @@ void fetchSpools() {
     const char* name = spool["filament"]["name"] | "";
     lv_obj_t* row = lv_btn_create(list);
     lv_obj_set_size(row, 442, 42);
-    lv_obj_set_style_bg_color(row, lv_color_hex(0x102035), 0);
-    lv_obj_set_style_radius(row, 6, 0);
+    styleListRow(row);
     lv_obj_add_event_cb(row, [](lv_event_t* e) {
       selected_id = (int)(intptr_t)lv_event_get_user_data(e);
     }, LV_EVENT_CLICKED, (void*)(intptr_t)id);

@@ -93,7 +93,7 @@ void buildScreen() {
   lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_all(list, 4, 0);
   lv_obj_set_style_pad_row(list, 4, 0);
-  lv_obj_set_style_bg_color(list, lv_color_hex(0x0a1020), 0);
+  styleListPanel(list);
 
   int saved = prefsGetInt("m220_width", 576);
   width = saved >= 384 && saved <= 576 && saved % 8 == 0 ? saved : 576;
@@ -110,6 +110,7 @@ void buildScreen() {
   width_label = lv_label_create(screen);
   lv_obj_set_width(width_label, 120);
   lv_obj_set_style_text_align(width_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(width_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_set_pos(width_label, 180, 276);
   updateWidth();
 
@@ -149,7 +150,7 @@ void handlePrinterSettingsDeferredActions() {
     for (size_t i = 0; i < count && lvPoolHasRoomForRow(); ++i) {
       lv_obj_t* row = lv_btn_create(list);
       lv_obj_set_size(row, 420, 42);
-      styleOutlineButton(row);
+      styleListRow(row);
       lv_obj_add_event_cb(row, [](lv_event_t* e) {
         const char* address = static_cast<const char*>(lv_event_get_user_data(e));
         prefsPutString("m220_addr", address);
