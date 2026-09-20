@@ -66,24 +66,26 @@ static inline lv_obj_t* lv_event_get_target(lv_event_t* e) { return e->target; }
 static inline void* lv_obj_get_user_data(lv_obj_t* obj) { return obj->user_data; }
 ''')
     (temp / "services").mkdir()
-    (temp / "services/prefs_store.h").write_text('extern bool prefsPutInt(const char*, int);')
+    (temp / "services/filaman_api.h").write_text('''
+#include <stddef.h>
+struct FilaManLabelPreset { int id; char name[64]; bool selected; };
+''')
     callback_source = r'''
 #include <assert.h>
+#include "services/filaman_api.h"
 #include "ui/label_preset_selection.h"
-static int stored = 0;
-static int refreshes = 0;
-bool prefsPutInt(const char*, int id) { stored = id; return true; }
-void requestLabelPresetRefresh() { ++refreshes; }
+void requestLabelPresetSelection(int) {}
 int main() {
-  lv_obj_t target = {(void*)99};
-  lv_event_t event = {(void*)7, &target};
-  labelPresetRowCb(&event);
-  assert(stored == 7);
-  assert(refreshes == 1);
+  FilaManLabelPreset presets[2]{{7,"Local",false},{42,"Server",true}};
+  assert(filamanResolvedPresetId(presets, 2, true, 7) == 42);
+  presets[1].selected = false;
+  assert(filamanResolvedPresetId(presets, 2, true, 99) == 0);
+  assert(filamanResolvedPresetId(presets, 2, false, 7) == 7);
+  assert(filamanResolvedPresetId(presets, 2, false, 99) == 0);
 }
 '''
     result = subprocess.run(
-        ["g++", "-std=c++11", f"-I{temp}", f"-I{root / 'src'}", "-x", "c++", "-", str(root / "src/ui/label_preset_selection.cpp"), "-o", "/tmp/test_filaman_label_callback"],
+        ["g++", "-std=c++11", f"-I{temp}", f"-I{root / 'src'}", f"-I{json_include}", "-x", "c++", "-", str(root / "src/ui/label_preset_selection.cpp"), "-o", "/tmp/test_filaman_label_callback"],
         input=callback_source, text=True, capture_output=True,
     )
     assert result.returncode == 0, result.stderr

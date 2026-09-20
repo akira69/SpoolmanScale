@@ -38,12 +38,26 @@ class HTTPClient {
   void end() {}
 };
 ''')
+    (d / 'lvgl.h').write_text('''
+#pragma once
+typedef struct { void* user_data; } lv_event_t;
+static inline void* lv_event_get_user_data(lv_event_t* e) { return e->user_data; }
+''')
+    (d / 'services').mkdir()
+    (d / 'services/filaman_api.h').write_text('''
+#pragma once
+#include <stddef.h>
+struct FilaManLabelPreset { int id; char name[64]; bool selected; };
+''')
     source = r'''
 #include <assert.h>
 #include <string>
 #include "services/filaman_print_pending.h"
+#include "ui/label_preset_selection.h"
 std::string seen_url, seen_auth, seen_body, response_body;
 int posts = 0, response_code = 201;
+int requested_preset = -1;
+void requestLabelPresetSelection(int id) { requested_preset = id; }
 int filamanRequestLabelPrint(const char*, const char*, int, int, int*, uint32_t);
 int main() {
   int id = 0;
@@ -65,9 +79,12 @@ int main() {
   assert(pending.request(123, 7));
   pending.cancel();
   assert(!pending.take(&spool, &preset));
+  lv_event_t event = {(void*)42};
+  labelPresetRowCb(&event);
+  assert(requested_preset == 42);
 }
 '''
-    result = subprocess.run(['g++', '-std=c++11', f'-I{d}', f'-I{root / "src"}', f'-I{root / ".pio/libdeps/wt32-sc01-plus/ArduinoJson/src"}', '-x', 'c++', '-', str(root / 'src/services/filaman_print_request.cpp'), '-o', str(d / 'check')], input=source, text=True, capture_output=True)
+    result = subprocess.run(['g++', '-std=c++11', f'-I{d}', f'-I{root / "src"}', f'-I{root / ".pio/libdeps/wt32-sc01-plus/ArduinoJson/src"}', '-x', 'c++', '-', str(root / 'src/services/filaman_print_request.cpp'), str(root / 'src/ui/label_preset_selection.cpp'), '-o', str(d / 'check')], input=source, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     result = subprocess.run([str(d / 'check')], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

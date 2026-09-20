@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory() as tmp:
     header('WiFi.h', 'struct WiFiClass { void disconnect(bool) {} }; extern WiFiClass WiFi;\n')
     header('esp_heap_caps.h', '#include <assert.h>\n#include <stdlib.h>\n#define MALLOC_CAP_SPIRAM 0\nextern bool thumbnail_fail; extern int loading_depth; inline void* heap_caps_malloc(size_t n, int) { assert(loading_depth==1); return thumbnail_fail ? nullptr : malloc(n); }\n')
     header('lvgl.h', LVGL_SHIM)
-    header('services/filaman_api.h', '''#include <stddef.h>\n#include <stdint.h>\nstruct FilaManLabelPreset { int id; char name[64]; };\nint filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t*);\nint filamanRequestLabelPrint(const char*,const char*,int,int,int*,uint32_t=8000);\n''')
+    header('services/filaman_api.h', '''#include <stddef.h>\n#include <stdint.h>\nstruct FilaManLabelPreset { int id; char name[64]; bool selected; };\nint filamanListLabelPresets(const char*,const char*,FilaManLabelPreset*,size_t,size_t*,bool* = nullptr);\nint filamanSelectLabelPreset(const char*,const char*,int,uint32_t=8000);\nint filamanRequestLabelPrint(const char*,const char*,int,int,int*,uint32_t=8000);\n''')
     header('services/http_progress.h', '#include <stddef.h>\nextern bool progress_active; struct HttpStallTime {}; struct HttpStall { explicit HttpStall(void (*)(size_t)) { progress_active=true; } ~HttpStall() { progress_active=false; } };\n')
     header('ui/loading_overlay.h', 'void loadingOverlayShow(const char*); void loadingOverlayHide(); void loadingOverlayTick(); void loadingOverlayProgress(size_t);\n')
     header('app/app_state.h', 'extern bool sm_found; extern int sm_id; extern char cfg_wifi_ssid[33]; extern char cfg_wifi_password[65];\n')
@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory() as tmp:
     header('services/wifi_manager.h', 'bool wifiManagerIsConnected(); void wifiManagerBegin(const char*, const char*);\n')
     header('ui/navigation.h', 'void hideAllOverlays();\n')
     header('ui/more_info_screen.h', 'void showMoreInfoScreen();\n')
-    header('ui/label_preset_selection.h', '#include <lvgl.h>\nvoid labelPresetRowCb(lv_event_t*);\n')
+    header('ui/label_preset_selection.h', '#include <lvgl.h>\n#include <stddef.h>\nstruct FilaManLabelPreset;\nint filamanResolvedPresetId(const FilaManLabelPreset*,size_t,bool,int);\nvoid requestLabelPresetSelection(int);\nvoid labelPresetRowCb(lv_event_t*);\n')
     header('ui/printer_settings_screen.h', 'void requestPrinterSettingsScreen();\n')
     header('ui/ui_common.h', '#include <lvgl.h>\nvoid releaseScreen(lv_obj_t**); inline bool lvPoolHasRoomForRow() { return true; } inline void styleOutlineButton(lv_obj_t*) {} inline void styleListPanel(lv_obj_t*) {} inline void styleListRow(lv_obj_t*, bool = false) {} inline lv_obj_t* buildOverlayScreen() { return lv_obj_create(nullptr); } inline void buildSubHeader(lv_obj_t* p,const char*,lv_event_cb_t cb,const char* = nullptr) { auto* b=lv_btn_create(p); lv_obj_set_pos(b,12,8); lv_obj_add_event_cb(b,cb,LV_EVENT_CLICKED,nullptr); }\n')
     source = r'''
@@ -38,6 +38,7 @@ with tempfile.TemporaryDirectory() as tmp:
 #include <vector>
 #include <lvgl.h>
 #include "ui/label_print_screen.h"
+#include "ui/label_preset_selection.h"
 #include "services/filaman_api.h"
 #include "services/filaman_labels.h"
 #include "services/label_printer.h"
@@ -57,6 +58,8 @@ bool sm_found=true; int sm_id=123;
 char cfg_wifi_ssid[33]="wifi", cfg_wifi_password[65]="pass";
 int preset=7, posts=0, sent_spool=0, sent_preset=0, closed=0, status_id=0;
 int response=201, fetch_response=-1, preset_fetches=0, preset_response=200, content_delta=0;
+int selection_requests=0, selection_response=204, selected_request=-1, list_mode=0;
+int operations=0, last_list_operation=0, last_render_operation=0, last_render_preset=-1;
 int loading_depth=0, loading_shown=0, loading_hidden=0, print_calls=0;
 bool progress_active=false, thumbnail_fail=false, print_result=true;
 std::string loading_message;
@@ -76,7 +79,7 @@ void loadingOverlayShow(const char* message) { assert(loading_depth++==0); ++loa
 void loadingOverlayHide() { assert(loading_depth--==1); ++loading_hidden; }
 void loadingOverlayTick() { assert(loading_depth==1); }
 void loadingOverlayProgress(size_t) { loadingOverlayTick(); }
-void balanced(int before) { assert(loading_shown==before+1 && loading_hidden==loading_shown && loading_depth==0 && !progress_active); }
+void balanced(int before,int requests=1) { assert(loading_shown==before+requests && loading_hidden==loading_shown && loading_depth==0 && !progress_active); }
 bool labelPrinterPrint(const LabelPrinterConfig& c,const LabelRaster&,char* error,size_t n,LabelPrinterProgressFn progress) {
   assert(loading_depth==1 && c.model==config.model && !strcmp(c.address,config.address));
   assert(progress); progress(); ++print_calls; snprintf(error,n,"write failed"); return print_result;
@@ -91,10 +94,27 @@ int prefsGetInt(const char*,int) { return preset; }
 bool prefsPutInt(const char*,int v) { preset=v; return true; }
 String prefsGetString(const char*) { return String("aa:bb:cc:dd:ee:ff"); }
 bool prefsPutString(const char*,const char*) { return true; }
-int filamanListLabelPresets(const char*,const char*,FilaManLabelPreset* out,size_t,size_t* count) { assert(loading_depth==1 && progress_active); if (!preset_fetches) assert(latestStatus()->text.empty()); ++preset_fetches; out[0].id=7; out[0].name[0]='A'; out[0].name[1]=0; *count=1; return preset_response; }
-int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { assert(loading_depth==1 && progress_active); ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return response; }
-int filamanFetchMonoLabel(const char*,const char*,int,int,uint16_t width,const char* orientation,LabelRaster* out,uint32_t) {
+int filamanListLabelPresets(const char*,const char*,FilaManLabelPreset* out,size_t,size_t* count,bool* known) {
   assert(loading_depth==1 && progress_active);
+  if (!preset_fetches) assert(latestStatus()->text.empty());
+  ++preset_fetches; last_list_operation=++operations;
+  if (preset_response!=200) { *count=0; if (known) *known=false; return preset_response; }
+  out[0]={7,"A",false};
+  *count=1;
+  if (list_mode==0 || list_mode==1) { out[1]={42,"Server",list_mode==0}; *count=2; }
+  if (known) *known=list_mode!=2 && list_mode!=3;
+  return 200;
+}
+int filamanSelectLabelPreset(const char*,const char*,int chosen,uint32_t) {
+  assert(loading_depth==1 && progress_active);
+  ++selection_requests; selected_request=chosen;
+  return selection_response;
+}
+int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { assert(loading_depth==1 && progress_active); ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return response; }
+int filamanFetchMonoLabel(const char*,const char*,int,int chosen,uint16_t width,const char* orientation,LabelRaster* out,uint32_t) {
+  assert(loading_depth==1 && progress_active);
+  last_render_operation=++operations; last_render_preset=chosen;
+  assert(last_list_operation && last_list_operation<last_render_operation);
   static int fetches=0;
   if (!fetches++) assert(latestStatus()->text.empty());
   assert(width==(config.model==LabelPrinterModel::M220 ? 576 : 384));
@@ -109,7 +129,9 @@ void requestPrinterSettingsScreen() {}
 void tap(int x,int y) { for (auto it=objects.rbegin();it!=objects.rend();++it) if (auto* o=*it) if (o->x==x && o->y==y && o->cb) { assert(!o->disabled); lv_event_t e; e.user_data=o->user_data; o->cb(&e); return; } assert(false); }
 int main() {
   fetch_response=200;
-  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
+  int before=loading_shown;
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
+  assert(preset==42 && last_render_preset==42);
   for (int x: {15,170,325}) {
     auto* button=at(x,268);
     assert(button->width==140 && button->height==44);
@@ -120,19 +142,21 @@ int main() {
     assert(o->y>=preview_status->y+preview_status->height);
     assert(o->y+o->height<=252);
   }
-  tap(325,268); handleLabelPrintDeferredActions();
+  before=loading_shown; tap(325,268); handleLabelPrintDeferredActions(); balanced(before);
   auto* refresh=at(320,8);
   assert(refresh->width==100 && refresh->height==34 && refresh->x+refresh->width<=420);
   int before_refresh_fetch=preset_fetches;
   tap(320,8); handleLabelPrintDeferredActions();
   assert(preset_fetches==before_refresh_fetch+1);
-  lv_obj_t* default_row=nullptr;
-  for (auto* o: objects) if (o->width==392 && o->cb && o->user_data==nullptr) default_row=o;
-  assert(default_row);
-  lv_event_t select; select.user_data=nullptr; default_row->cb(&select);
-  assert(preset==0);
+  lv_event_t select; select.user_data=(void*)42;
+  int before_selection_requests=selection_requests;
+  preset=7; labelPresetRowCb(&select);
+  assert(preset==7 && selection_requests==before_selection_requests);
   size_t before_refresh=objects.size();
+  before=loading_shown; handleLabelPrintDeferredActions(); balanced(before);
+  assert(selection_requests==before_selection_requests+1 && selected_request==42 && preset==42);
   handleLabelPrintDeferredActions();
+  assert(selection_requests==before_selection_requests+1);
   bool new_default=false, new_saved=false;
   for (size_t i=before_refresh;i<objects.size();++i) {
     auto* o=objects[i];
@@ -141,9 +165,42 @@ int main() {
     if (o->user_data==(void*)7) new_saved=true;
   }
   assert(new_default && new_saved);
-  preset=7;
+
+  selection_response=500; select.user_data=(void*)7;
+  labelPresetRowCb(&select);
+  assert(preset==42);
+  before=loading_shown; handleLabelPrintDeferredActions(); balanced(before);
+  assert(selected_request==7 && preset==42);
+  selection_response=204;
+
+  select.user_data=nullptr; labelPresetRowCb(&select);
+  assert(preset==42);
+  before=loading_shown; handleLabelPrintDeferredActions(); balanced(before);
+  assert(selected_request==0 && preset==0);
+
+  list_mode=1; preset=42; before=loading_shown;
+  tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset==0);
+  list_mode=2; preset=7; before=loading_shown;
+  tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset==7);
+  list_mode=3; preset=42; before=loading_shown;
+  tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset==0);
+  preset_response=500; preset=42; before=loading_shown;
+  tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset==42);
+  preset_response=200; list_mode=0; before=loading_shown;
+  tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset==42);
+  list_mode=5; before=loading_shown;
+  tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset==0);
+
+  list_mode=0; preset=7;
   tap(12,8); handleLabelPrintDeferredActions();
   handleLabelPrintDeferredActions();
+  assert(preset==42 && last_render_preset==42);
   assert(posts==0);
   preset=7; tap(15,268); tap(15,268); preset=8;
   handleLabelPrintDeferredActions();
@@ -173,8 +230,8 @@ int main() {
   for (auto model: {LabelPrinterModel::M220,LabelPrinterModel::M110}) {
     config.model=model;
     config.media_width_mm=30; config.media_length_mm=40;
-    int before=loading_shown;
-    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
+    before=loading_shown;
+    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
     before=loading_shown;
     print_result=false; tap(170,268); handleLabelPrintDeferredActions(); balanced(before);
     assert(loading_message==(model==LabelPrinterModel::M220 ? "Sending to M220..." : "Sending to M110..."));
@@ -193,16 +250,16 @@ int main() {
     assert(print_calls==calls && loading_shown==before && status_id==STR_LABEL_PRINTER_SELECT);
     strcpy(config.address,"aa:bb:cc:dd:ee:ff");
   }
-  int before=loading_shown;
+  before=loading_shown;
   content_delta=-1;
-  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
   assert(status_id==STR_LABEL_PRINTER_MEDIA);
   for (auto it=objects.rbegin();it!=objects.rend();++it) {
     auto* o=*it;
     if (o->x==170 && o->y==268) { assert(o->disabled); break; }
   }
   content_delta=0; before=loading_shown;
-  thumbnail_fail=true; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
+  thumbnail_fail=true; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
   assert(status_id==STR_LABEL_PRINTER_NO_PSRAM);
   before_posts=posts;
   assert(!at(15,268)->disabled);
@@ -211,16 +268,19 @@ int main() {
   thumbnail_fail=false;
   for (int code: {FILAMAN_LABEL_NO_PSRAM,500,401,403}) {
     before=loading_shown; fetch_response=code;
-    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
+    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
   }
   fetch_response=200; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   before=loading_shown; response=500; tap(15,268); handleLabelPrintDeferredActions(); balanced(before);
   before=loading_shown; preset_response=500;
   requestLabelPresetSettingsScreen(); handleLabelPrintDeferredActions(); balanced(before);
+  preset=7; fetch_response=200; before=loading_shown;
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
+  assert(preset==7 && last_render_preset==7);
   before=loading_shown; wifi=false;
   requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   requestLabelPresetSettingsScreen(); handleLabelPrintDeferredActions();
-  assert(loading_shown==before && loading_depth==0);
+  assert(preset==7 && loading_shown==before && loading_depth==0);
 }
 '''
     result = subprocess.run(['g++','-std=c++11',f'-I{tmp}',f'-I{root / "src"}', f'-I{root / "src/ui"}','-x','c++','-',str(root/'src/ui/label_preset_selection.cpp'),os.environ.get('FILAMAN_LABEL_SCREEN_SOURCE', str(root/'src/ui/label_print_screen.cpp')),'-o',str(tmp/'check')],input=source,text=True,capture_output=True)
