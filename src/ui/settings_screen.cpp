@@ -157,17 +157,25 @@ void buildSettingsScreen() {
     lv_obj_add_event_cb(print, [](lv_event_t*) { requestManualSpoolScreen(); },
                         LV_EVENT_CLICKED, nullptr);
 
-    lv_obj_t* icon = lv_label_create(print);
+    lv_obj_t* content = lv_obj_create(print);
+    lv_obj_remove_style_all(content);
+    lv_obj_set_size(content, 420, 32);
+    lv_obj_center(content);
+    lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(content, 14, 0);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* icon = lv_label_create(content);
     lv_label_set_text(icon, kPrinterIcon);
     lv_obj_set_style_text_color(icon, lv_color_hex(UI_COL_ACCENT), 0);
     lv_obj_set_style_text_font(icon, &lv_font_printer_24, 0);
-    lv_obj_align(icon, LV_ALIGN_LEFT_MID, 16, 0);
 
-    lv_obj_t* label = lv_label_create(print);
+    lv_obj_t* label = lv_label_create(content);
     lv_label_set_text(label, T(STR_LABEL_PRINT));
     lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
     lv_obj_set_style_text_font(label, UI_FONT_TITLE, 0);
-    lv_obj_center(label);
   }
 
   if (sd_verbose) logSD("[verbose] buildSettingsScreen: done");
