@@ -167,7 +167,7 @@ void buildSettingsScreen() {
     lv_label_set_text(label, T(STR_LABEL_PRINT));
     lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
     lv_obj_set_style_text_font(label, UI_FONT_TITLE, 0);
-    lv_obj_align(label, LV_ALIGN_LEFT_MID, 62, 0);
+    lv_obj_center(label);
   }
 
   if (sd_verbose) logSD("[verbose] buildSettingsScreen: done");
