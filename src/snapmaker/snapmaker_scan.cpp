@@ -11,17 +11,17 @@
 
 SnapmakerScanResult scanSnapmakerTag(uint8_t *uid, uint8_t uid_len) {
   if (uid_len != 4) return SNAPMAKER_SCAN_NO_AUTH;
-  
+
   uint8_t keyA[16][6];
   if (!deriveSnapmakerKeys(uid, keyA)) {
     return SNAPMAKER_SCAN_NO_AUTH;
   }
-  
+
   char uid_str[24];
   snprintf(uid_str, sizeof(uid_str), "%02X:%02X:%02X:%02X", uid[0], uid[1], uid[2], uid[3]);
 
   uint8_t sec0_blocks[4][16];
-  
+
   uint8_t dummy_uid[NFC_UID_MAX];
   uint8_t dummy_uid_len = 0;
   nfcReadPassiveTarget(dummy_uid, &dummy_uid_len, 150); // Wake from HALT
@@ -38,26 +38,26 @@ SnapmakerScanResult scanSnapmakerTag(uint8_t *uid, uint8_t uid_len) {
 
   uint8_t sec2_blocks[4][16];
   bool sec2_ok = nfcReadMifareSector(2, keyA[2], uid, sec2_blocks, NFC_KEY_A);
-  
+
   SnapmakerScanResult result = (sec1_ok && sec2_ok) ? SNAPMAKER_SCAN_OK : SNAPMAKER_SCAN_PARTIAL;
-  
+
   // Parse
   memset(&g_tag, 0, sizeof(g_tag));
   memcpy(g_tag.uid, uid, 4);
   strncpy(g_tag.uid_str, uid_str, sizeof(g_tag.uid_str) - 1);
   g_tag.uid_str[sizeof(g_tag.uid_str)-1] = '\0';
-  
+
   // Sector 0
   // Block 1 (bytes 16..31): VENDOR (ASCII, NUL-padded)
   strncpy(g_tag.vendor, (char*)sec0_blocks[1], sizeof(g_tag.vendor) - 1);
   g_tag.vendor[sizeof(g_tag.vendor)-1] = '\0';
-  
+
   // Sector 1
   if (sec1_ok) {
     // Block 0
     uint16_t main_type = sec1_blocks[0][2] | (sec1_blocks[0][3] << 8);
     uint16_t sub_type = sec1_blocks[0][4] | (sec1_blocks[0][5] << 8);
-    
+
     const char* mt_str = "Unknown";
     switch(main_type) {
       case 1: mt_str = "PLA"; break;
@@ -74,7 +74,7 @@ SnapmakerScanResult scanSnapmakerTag(uint8_t *uid, uint8_t uid_len) {
       case 22: mt_str = "PEBA"; break;
       case 23: mt_str = "TPE"; break;
     }
-    
+
     const char* st_str = "";
     switch(sub_type) {
       case 1: st_str = "Basic"; break;
@@ -91,14 +91,14 @@ SnapmakerScanResult scanSnapmakerTag(uint8_t *uid, uint8_t uid_len) {
       case 12: st_str = "Translucent"; break;
       case 13: st_str = "Full Spectrum"; break;
     }
-    
+
     if (strlen(st_str) > 0) {
       snprintf(g_tag.material, sizeof(g_tag.material), "%s %s", mt_str, st_str);
     } else {
       strncpy(g_tag.material, mt_str, sizeof(g_tag.material) - 1);
     }
     g_tag.material[sizeof(g_tag.material)-1] = '\0';
-    
+
     // Block 1
     snprintf(g_tag.color_hex, sizeof(g_tag.color_hex), "#%02X%02X%02X",
              sec1_blocks[1][0], sec1_blocks[1][1], sec1_blocks[1][2]);
@@ -107,20 +107,20 @@ SnapmakerScanResult scanSnapmakerTag(uint8_t *uid, uint8_t uid_len) {
     g_tag.color = spoolColorFromRgba(sec1_blocks[1][0], sec1_blocks[1][1],
                                      sec1_blocks[1][2], 0xFF);
   }
-  
+
   if (sec2_ok) {
     // Block 0
     g_tag.spool_weight = sec2_blocks[0][2] | (sec2_blocks[0][3] << 8);
-    
+
     // Block 1
     g_tag.temp_max = sec2_blocks[1][4] | (sec2_blocks[1][5] << 8);
     g_tag.temp_min = sec2_blocks[1][6] | (sec2_blocks[1][7] << 8);
-    
+
     // Block 2
     memcpy(g_tag.production_date, sec2_blocks[2], 8);
     g_tag.production_date[8] = '\0';
   }
-  
+
   strncpy(g_tag.tray_uuid, uid_str, sizeof(g_tag.tray_uuid) - 1);
   g_tag.tray_uuid[sizeof(g_tag.tray_uuid)-1] = '\0';
 

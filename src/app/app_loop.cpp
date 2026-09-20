@@ -1580,6 +1580,12 @@ void appLoop() {
         const bool newly_placed = !tag_present;
         tag_present = true;
         if (newly_placed) updateHeaderStatus();
+        {
+          char u[16];
+          snprintf(u, sizeof(u), "%02X:%02X:%02X:%02X",
+                   uid[0], uid[1], uid[2], uid[3]);
+          TagSeen::note(u, "Bambu");
+        }
         // A successful read means zero consecutive misses, by definition.
         // This used to be reset only when the UID changed, so after the very
         // first read of a spool the counter never went back to zero. The

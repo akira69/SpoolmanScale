@@ -30,7 +30,6 @@
 #include "ui/tag_write_popup.h"
 #include "ui/theme.h"
 #include "ui/label_print_screen.h"
-#include "ui/theme.h"
 #include "ui_common.h"
 
 

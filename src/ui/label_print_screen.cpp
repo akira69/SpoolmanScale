@@ -20,6 +20,7 @@
 #include "ui/more_info_screen.h"
 #include "ui/navigation.h"
 #include "ui/printer_settings_screen.h"
+#include "ui/theme.h"
 #include "ui/ui_common.h"
 #include "lang.h"
 
@@ -202,7 +203,7 @@ void buildPresetScreen() {
   lv_label_set_text(status, "");
   lv_obj_set_width(status, 440);
   lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_color(status, lv_color_hex(0xb7c9dc), 0);
+  lv_obj_set_style_text_color(status, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_set_pos(status, 20, 56);
 
   list = lv_obj_create(screen);

@@ -21,7 +21,7 @@ bool deriveSnapmakerKeys(const uint8_t* uid4, uint8_t keyA[16][6], uint8_t keyB[
   if (!hmac_sha256(SNAPMAKER_SALT_A, 25, uid4, 4, prk_A)) {
     return false;
   }
-  
+
   if (keyB != nullptr) {
     if (!hmac_sha256(SNAPMAKER_SALT_B, 32, uid4, 4, prk_B)) {
       return false;
@@ -30,7 +30,7 @@ bool deriveSnapmakerKeys(const uint8_t* uid4, uint8_t keyA[16][6], uint8_t keyB[
 
   for (int i = 0; i < 16; i++) {
     uint8_t okm[32];
-    
+
     std::string infoA = "key_a_" + std::to_string(i);
     uint8_t inputA[32];
     size_t lenA = infoA.length();

@@ -644,4 +644,3 @@ lv_font_t lv_font_fr_supp_10 = {
 
 
 #endif /*#if LV_FONT_FR_SUPP_10*/
-

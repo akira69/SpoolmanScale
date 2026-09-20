@@ -15,6 +15,7 @@
 #include "ui/loading_overlay.h"
 #include "ui/info_popup.h"
 #include "ui/navigation.h"
+#include "ui/theme.h"
 #include "ui/ui_common.h"
 
 namespace {

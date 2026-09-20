@@ -19,6 +19,7 @@
 #include "ui/navigation.h"
 #include "ui/spoolman_lookup.h"
 #include "ui/tag_display.h"
+#include "ui/theme.h"
 #include "ui/ui_common.h"
 
 namespace {
@@ -85,7 +86,7 @@ void buildScreen() {
   lv_obj_set_width(status, 320);
   lv_obj_set_pos(status, 80, 62);
   lv_obj_set_style_text_align(status, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_color(status, lv_color_hex(0xb7c9dc), 0);
+  lv_obj_set_style_text_color(status, lv_color_hex(UI_COL_INK_2), 0);
   lv_label_set_text(status, "");
 
   list = lv_obj_create(screen);
