@@ -837,7 +837,7 @@ const char* const STRINGS[][3] = {
   { "Label-Vorschau", "Label preview",
     "Aperçu de l'étiquette" },  // STR_LABEL_PREVIEW
   { "Vorlage ändern", "Change preset",
-    "Changer de modèle" },  // STR_LABEL_CHANGE_PRESET
+    "Choisir modèle" },  // STR_LABEL_CHANGE_PRESET
   { "Label-Vorlage", "Label preset",
     "Modèle d'étiquette" },  // STR_LABEL_PRESET_TITLE
   { "Standard-Label", "Default label",
