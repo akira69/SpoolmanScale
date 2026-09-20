@@ -15,6 +15,7 @@
 #include "services/http_progress.h"
 #include "services/wifi_manager.h"
 #include "ui/more_info_screen.h"
+#include "ui/loading_overlay.h"
 #include "ui/navigation.h"
 #include "ui/spoolman_lookup.h"
 #include "ui/tag_display.h"
@@ -105,14 +106,17 @@ void fetchSpools() {
   lv_obj_clean(list);
   page_complete = false;
   if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
-  setStatus(T(STR_SPOOLS_LOADING));
-  lv_refr_now(nullptr);
+  loadingOverlayShow(T(STR_SPOOLS_LOADING));
 
   SpiRamAllocator alloc;
   JsonDocument doc(&alloc);
-  HttpStallTime stall;
-  const int code = filamanGetSpoolPageJson(backendBaseUrl(), filamanApiKey(),
-                                            page, rowsPerPage(), doc, &total);
+  int code;
+  {
+    HttpStall stall(loadingOverlayProgress);
+    code = filamanGetSpoolPageJson(backendBaseUrl(), filamanApiKey(),
+                                  page, rowsPerPage(), doc, &total);
+  }
+  loadingOverlayHide();
   if (code != 200) {
     char message[48];
     snprintf(message, sizeof(message), T(STR_SPOOLS_LOAD_FAIL), code);
@@ -164,9 +168,16 @@ void handleManualSpoolDeferredActions() {
     const int id = selected_id;
     selected_id = 0;
     if (tag_present) { setStatus(T(STR_SPOOLS_REMOVE_TAG)); return; }
-    setStatus(T(STR_SPOOLS_OPENING));
+    if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
+    loadingOverlayShow(T(STR_SPOOLS_OPENING));
     clearTagDisplay();
-    if (querySpoolmanById(id) && sm_found && sm_id == id) {
+    bool found;
+    {
+      HttpStall stall(loadingOverlayProgress);
+      found = querySpoolmanById(id) && sm_found && sm_id == id;
+    }
+    loadingOverlayHide();
+    if (found) {
       cancelPendingNfcClear();
       // This runs from the app loop, outside LVGL's event callback. Free the
       // list now so More info can use its LVGL pool memory immediately.

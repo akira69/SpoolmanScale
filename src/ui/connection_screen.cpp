@@ -13,7 +13,7 @@
 #include "ui_common.h"
 #include "wifi_info.h"
 #include "services/wifi_manager.h"
-#include "services/prefs_store.h"
+#include "services/label_printer.h"
 #include "ui/printer_settings_screen.h"
 
 
@@ -241,8 +241,11 @@ void buildConnectionScreen() {
     lv_obj_set_style_text_font(title, UI_FONT_TITLE, 0);
     lv_obj_align(title, LV_ALIGN_CENTER, 0, 4);
     lv_obj_t *sub = lv_label_create(btn_printer);
-    String printer_address = prefsGetString("m220_addr");
-    lv_label_set_text(sub, printer_address.isEmpty() ? T(STR_PRINTER_NONE) : printer_address.c_str());
+    const LabelPrinterConfig printer = labelPrinterLoadConfig();
+    if (labelPrinterConfigured(printer))
+      lv_label_set_text_fmt(sub, "%s: %s", labelPrinterProfile(printer.model).name,
+                            printer.name[0] ? printer.name : printer.address);
+    else lv_label_set_text(sub, T(STR_PRINTER_NONE));
     lv_obj_set_style_text_color(sub, lv_color_hex(UI_COL_CAPTION), 0);
     lv_obj_set_style_text_font(sub, UI_FONT_SMALL, 0);
     lv_obj_set_width(sub, HALF_SUB_W);

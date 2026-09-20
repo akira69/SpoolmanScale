@@ -74,16 +74,19 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
   }
   image.pixels = static_cast<uint8_t*>(heap_caps_malloc(image.length, MALLOC_CAP_SPIRAM));
   if (!image.pixels) { http.end(); return FILAMAN_LABEL_NO_PSRAM; }
-  WiFiClient* stream = http.getStreamPtr();
+  WiFiClient* raw = http.getStreamPtr();
+  HttpProgressStream progress(*raw);
+  Stream* input = httpProgressActive()
+      ? static_cast<Stream*>(&progress) : static_cast<Stream*>(raw);
   size_t used = 0;
   while (used < image.length) {
-    const size_t got = stream->readBytes(image.pixels + used, image.length - used);
+    const size_t got = input->readBytes(image.pixels + used, image.length - used);
     if (!got) break;
     used += got;
   }
   // A Content-Length mismatch is rejected above; also catch surplus bytes
   // already present on the socket before handing the raster to a printer.
-  const bool valid = used == image.length && !stream->available() &&
+  const bool valid = used == image.length && !raw->available() &&
                      labelRasterPaddingValid(image);
   http.end();
   if (!valid) { filamanFreeLabel(&image); return -2; }

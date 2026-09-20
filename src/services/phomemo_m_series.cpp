@@ -1,5 +1,4 @@
 #include "services/phomemo_m_series.h"
-#include "services/phomemo_m220.h"
 #include "services/phomemo_m_series_protocol.h"
 
 #include <Arduino.h>
@@ -241,14 +240,4 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
   }
   delete client;
   return ok;
-}
-
-// Temporary adapters until the settings and print screens use the facade.
-size_t phomemoM220Scan(M220Device* out, size_t capacity) {
-  return labelPrinterScan(labelPrinterLoadConfig(), out, capacity);
-}
-
-bool phomemoM220Print(const char* address, const LabelRaster& image,
-                     char* error, size_t error_size) {
-  return phomemoMSeriesPrint(LabelPrinterModel::M220, address, image, error, error_size);
 }

@@ -112,7 +112,15 @@ int main() {
   assert(normalized.model == LabelPrinterModel::M110);
   assert(normalized.media_width_mm == 40);  // invalid 50 mm printable width resets
 
+  assert(labelPrinterDotsForMm(40) == 320);
+  assert(labelPrinterDotsForMm(30) == 240);
   assert(labelPrinterRasterWidth(LabelPrinterModel::M220, 40) == 576);
+  assert(labelPrinterRasterWidth(LabelPrinterModel::M220, 75) == 600);
+  LabelRaster media{576, 240, 72, nullptr, 0, 320, false};
+  assert(labelPrinterRasterFits(LabelPrinterModel::M220, media, 40, 30));
+  assert(!labelPrinterRasterFits(LabelPrinterModel::M220, media, 30, 40));
+  media.content_width = 480;
+  assert(!labelPrinterRasterFits(LabelPrinterModel::M220, media, 40, 30));
   assert(labelPrinterRasterWidth(LabelPrinterModel::M110, 40) == 384);
   uint8_t pixels[48 * 240] = {};
   LabelRaster raster{384, 240, 48, pixels, sizeof(pixels), 320, false};

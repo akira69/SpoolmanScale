@@ -870,26 +870,26 @@ const char* const STRINGS[][3] = {
     "Vérifiez et corrigez la bobine ou le modèle." },  // STR_LABEL_PC_INVALID
   { "Anfrage fehlgeschlagen. Im FilaMan-Tab prüfen, bevor erneut gesendet wird.", "Request failed. Check the FilaMan tab before sending again.",
     "Échec de la demande. Vérifiez l'onglet FilaMan avant de renvoyer." },  // STR_LABEL_PC_FAILED
-  { "M220 suchen", "Scan M220",
-    "Rechercher M220" },  // STR_LABEL_M220_SCAN
-  { "Auf M220 drucken", "Print on M220",
-    "Imprimer sur M220" },  // STR_LABEL_M220_PRINT
-  { "Kein M220 gefunden", "No M220 found",
-    "Aucune M220 trouvée" },  // STR_LABEL_M220_NONE
-  { "M220 auswählen", "Select an M220",
-    "Sélectionner une M220" },  // STR_LABEL_M220_SELECT
+  { "Drucker suchen", "Scan printers",
+    "Rechercher une imprimante" },  // STR_LABEL_PRINTER_SCAN
+  { "Drucken", "Print",
+    "Imprimer" },  // STR_LABEL_PRINTER_PRINT
+  { "Kein Drucker gefunden", "No printer found",
+    "Aucune imprimante trouvée" },  // STR_LABEL_PRINTER_NONE
+  { "Drucker auswählen", "Select a printer",
+    "Sélectionner une imprimante" },  // STR_LABEL_PRINTER_SELECT
   { "Vorlage muss zum eingelegten %u x %u mm Label passen", "Preset must match the loaded %u x %u mm label",
-    "Le modèle doit correspondre à l'étiquette chargée de %u x %u mm" },  // STR_LABEL_M220_MEDIA
+    "Le modèle doit correspondre à l'étiquette chargée de %u x %u mm" },  // STR_LABEL_PRINTER_MEDIA
   { "Label wird geladen...", "Fetching label...",
-    "Chargement de l'étiquette..." },  // STR_LABEL_M220_FETCH
-  { "Sende an M220...", "Sending to M220...",
-    "Envoi vers la M220..." },  // STR_LABEL_M220_SEND
+    "Chargement de l'étiquette..." },  // STR_LABEL_PRINTER_FETCH
+  { "Sende an %s...", "Sending to %s...",
+    "Envoi vers %s..." },  // STR_LABEL_PRINTER_SEND
   { "An Drucker gesendet", "Sent to printer",
-    "Envoyé à l'imprimante" },  // STR_LABEL_M220_SENT
+    "Envoyé à l'imprimante" },  // STR_LABEL_PRINTER_SENT
   { "Label konnte nicht geladen werden", "Could not fetch label",
-    "Impossible de charger l'étiquette" },  // STR_LABEL_M220_FAILED
+    "Impossible de charger l'étiquette" },  // STR_LABEL_PRINTER_FAILED
   { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration.",
-    "Pas de PSRAM pour l'étiquette. Vérifiez le matériel et la configuration." },  // STR_LABEL_M220_NO_PSRAM
+    "Pas de PSRAM pour l'étiquette. Vérifiez le matériel et la configuration." },  // STR_LABEL_PRINTER_NO_PSRAM
   { "Spulen", "Spools",
     "Bobines" },  // STR_SPOOLS_TITLE
   { "Spulen laden...", "Loading spools...",

@@ -9,7 +9,7 @@
 #include "services/device_name.h"
 #include "services/mdns_service.h"
 #include "services/user_options.h"
-#include "services/prefs_store.h"
+#include "services/label_printer.h"
 #include "lang.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/theme.h"
@@ -67,7 +67,7 @@ void updateHeaderStatus() {
   lv_obj_set_style_text_color(lbl_hdr_wifi, wifiColor(), 0);
 
   if (lbl_hdr_bt) {
-    if (backendIsFilaMan() && !prefsGetString("m220_addr").isEmpty())
+    if (backendIsFilaMan() && labelPrinterConfigured(labelPrinterLoadConfig()))
       lv_obj_clear_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
     else
       lv_obj_add_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);

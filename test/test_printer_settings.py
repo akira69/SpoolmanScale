@@ -115,7 +115,6 @@ static const int lv_font_montserrat_ext_12=0, lv_font_montserrat_ext_14=0, lv_fo
 #include "ui/info_popup.h"
 #include "ui/loading_overlay.h"
 #include "services/label_printer.h"
-#include "services/phomemo_m220.h"
 std::vector<lv_obj_t*> objects;
 std::vector<std::string> label_text;
 lv_obj_t* scr_connection=nullptr;
@@ -168,7 +167,6 @@ int prefsGetInt(const char* key,int) { return strstr(key,"_w") ? saved.media_wid
 bool prefsPutInt(const char*,int) { return true; }
 String prefsGetString(const char* key) { return String(strstr(key,"addr") ? saved.address : saved.name); }
 bool prefsPutString(const char*,const char*) { return true; }
-size_t phomemoM220Scan(M220Device*,size_t) { return 0; }
 bool renderedText(const char* text) { for (const auto& s: label_text) if (s.find(text)!=std::string::npos) return true; return false; }
 void tap(lv_obj_t* o) {
   assert(o && o->active && o->cb);

@@ -10,11 +10,13 @@
 #include "services/filaman_api.h"
 #include "services/filaman_labels.h"
 #include "services/filaman_print_pending.h"
-#include "services/phomemo_m220.h"
+#include "services/label_printer.h"
+#include "services/http_progress.h"
 #include "services/prefs_store.h"
 #include "services/wifi_manager.h"
 #include "ui/label_preset_selection.h"
 #include "ui/label_preset_group.h"
+#include "ui/loading_overlay.h"
 #include "ui/more_info_screen.h"
 #include "ui/navigation.h"
 #include "ui/printer_settings_screen.h"
@@ -46,8 +48,7 @@ bool back_pending = false;
 bool fetch_pending = false;
 bool refresh_rows_pending = false;
 bool print_pending = false;
-uint16_t preview_media_width_mm = M220_DEFAULT_MEDIA_WIDTH_MM;
-uint16_t preview_media_length_mm = M220_DEFAULT_MEDIA_LENGTH_MM;
+LabelPrinterConfig preview_printer{};
 
 void setStatus(const char* message) {
   if (status) lv_label_set_text(status, message);
@@ -57,16 +58,10 @@ void setHttpError(const char* message, int code) {
   if (status) lv_label_set_text_fmt(status, "%s (%d)", message, code);
 }
 
-uint16_t mediaDimension(const char* key, uint16_t fallback, uint16_t minimum,
-                        uint16_t maximum) {
-  const int saved = prefsGetInt(key, fallback);
-  return saved >= minimum && saved <= maximum ? saved : fallback;
-}
-
-void setMediaMismatch() {
+void setMediaMismatch(const LabelPrinterConfig& printer) {
   char message[96];
-  snprintf(message, sizeof(message), T(STR_LABEL_M220_MEDIA),
-           unsigned(preview_media_width_mm), unsigned(preview_media_length_mm));
+  snprintf(message, sizeof(message), T(STR_LABEL_PRINTER_MEDIA),
+           unsigned(printer.media_width_mm), unsigned(printer.media_length_mm));
   setStatus(message);
 }
 
@@ -153,10 +148,14 @@ void fillPresetList() {
 void fetchPresets() {
   if (!screen || !preset_page) return;
   if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
-  setStatus(T(STR_LABEL_LOADING));
-  lv_refr_now(nullptr);
-  const int code = filamanListLabelPresets(backendBaseUrl(), filamanApiKey(),
-                                           presets, kPresetCapacity, &preset_count);
+  loadingOverlayShow(T(STR_LABEL_LOADING));
+  int code;
+  {
+    HttpStall stall(loadingOverlayProgress);
+    code = filamanListLabelPresets(backendBaseUrl(), filamanApiKey(),
+                                  presets, kPresetCapacity, &preset_count);
+  }
+  loadingOverlayHide();
   if (code != 200) {
     preset_count = 0;
     fillPresetList();
@@ -253,37 +252,43 @@ bool drawPreview() {
 void fetchPreview() {
   if (!screen || preset_page) return;
   if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
-  setStatus(T(STR_LABEL_M220_FETCH));
-  lv_refr_now(nullptr);
-  preview_media_width_mm = mediaDimension("m220_media_w", M220_DEFAULT_MEDIA_WIDTH_MM, 20, 75);
-  preview_media_length_mm = mediaDimension("m220_media_h", M220_DEFAULT_MEDIA_LENGTH_MM, 10, 150);
-  const uint16_t width = m220RasterWidthForMedia(preview_media_width_mm);
-  const char* orientation = preview_media_width_mm >= preview_media_length_mm
+  preview_printer = labelPrinterLoadConfig();
+  const uint16_t width = labelPrinterRasterWidth(preview_printer.model,
+                                                preview_printer.media_width_mm);
+  const char* orientation = preview_printer.media_width_mm >= preview_printer.media_length_mm
       ? "landscape" : "portrait";
-  const int code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
-                                         spool_id, prefsGetInt("label_preset", 0),
-                                         width, orientation, &preview);
+  loadingOverlayShow(T(STR_LABEL_PRINTER_FETCH));
+  int code;
+  bool drawn = false;
+  {
+    HttpStall stall(loadingOverlayProgress);
+    code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
+                                spool_id, prefsGetInt("label_preset", 0),
+                                width, orientation, &preview);
+    if (code == 200) drawn = drawPreview();
+  }
+  loadingOverlayHide();
   if (code != 200) {
     switch (code) {
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
       case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-      case FILAMAN_LABEL_NO_PSRAM: setStatus(T(STR_LABEL_M220_NO_PSRAM)); break;
-      default: setHttpError(T(STR_LABEL_M220_FAILED), code); break;
+      case FILAMAN_LABEL_NO_PSRAM: setStatus(T(STR_LABEL_PRINTER_NO_PSRAM)); break;
+      default: setHttpError(T(STR_LABEL_PRINTER_FAILED), code); break;
     }
     return;
   }
-  if (!drawPreview()) {
-    setStatus(T(STR_LABEL_M220_NO_PSRAM));
+  if (!drawn) {
+    setStatus(T(STR_LABEL_PRINTER_NO_PSRAM));
     filamanFreeLabel(&preview);
     return;
   }
   lv_obj_clear_state(pc_button, LV_STATE_DISABLED);
-  if (labelRasterFitsM220Media(preview, preview_media_width_mm,
-                              preview_media_length_mm)) {
+  if (labelPrinterRasterFits(preview_printer.model, preview, preview_printer.media_width_mm,
+                            preview_printer.media_length_mm)) {
     setStatus("");
     lv_obj_clear_state(printer_button, LV_STATE_DISABLED);
   } else {
-    setMediaMismatch();
+    setMediaMismatch(preview_printer);
     lv_obj_add_state(printer_button, LV_STATE_DISABLED);
   }
 }
@@ -334,7 +339,7 @@ void buildPreviewScreen() {
     if (preview.pixels) print_pending = true;
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* printer_label = lv_label_create(printer_button);
-  lv_label_set_text(printer_label, T(STR_LABEL_M220_PRINT));
+  lv_label_set_text(printer_label, T(STR_LABEL_PRINTER_PRINT));
   lv_obj_set_style_text_color(printer_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(printer_label);
   lv_obj_add_state(printer_button, LV_STATE_DISABLED);
@@ -399,16 +404,18 @@ void handleLabelPrintDeferredActions() {
   }
   if (print_pending && screen && !preset_page) {
     print_pending = false;
-    String address = prefsGetString("m220_addr");
-    if (address.isEmpty()) setStatus(T(STR_LABEL_M220_SELECT));
+    const LabelPrinterConfig current = labelPrinterLoadConfig();
+    if (!labelPrinterConfigured(current)) setStatus(T(STR_LABEL_PRINTER_SELECT));
     else if (preview.pixels) {
-      if (!labelRasterFitsM220Media(preview, preview_media_width_mm,
-                                   preview_media_length_mm)) {
-        setMediaMismatch();
+      if (!labelPrinterRasterFits(current.model, preview, current.media_width_mm,
+                                 current.media_length_mm)) {
+        setMediaMismatch(current);
         return;
       }
-      setStatus(T(STR_LABEL_M220_SEND));
-      lv_refr_now(nullptr);
+      char send_message[64];
+      snprintf(send_message, sizeof(send_message), T(STR_LABEL_PRINTER_SEND),
+               labelPrinterProfile(current.model).name);
+      loadingOverlayShow(send_message);
       char error[80];
       // The label is already in PSRAM. Free the WiFi stack's internal heap
       // while the BLE stack sends it, then reconnect for the next API call.
@@ -416,20 +423,28 @@ void handleLabelPrintDeferredActions() {
       if (resume_wifi) {
         WiFi.disconnect(true);
         delay(100);
-        Serial.printf("M220 WiFi stopped: heap=%u\n", unsigned(ESP.getFreeHeap()));
+        Serial.printf("Label printer WiFi stopped: heap=%u\n", unsigned(ESP.getFreeHeap()));
       }
-      const bool sent = phomemoM220Print(address.c_str(), preview, error, sizeof(error));
+      const bool sent = labelPrinterPrint(current, preview, error, sizeof(error),
+                                         loadingOverlayTick);
       if (resume_wifi) wifiManagerBegin(cfg_wifi_ssid, cfg_wifi_password);
-      setStatus(sent ? T(STR_LABEL_M220_SENT) : error);
+      loadingOverlayHide();
+      setStatus(sent ? T(STR_LABEL_PRINTER_SENT) : error);
     }
   }
   int request_spool = 0, request_preset = 0;
   if (screen && pc_request.take(&request_spool, &request_preset)) {
     int request_id = 0;
-    const int code = wifiManagerIsConnected()
-      ? filamanRequestLabelPrint(backendBaseUrl(), filamanApiKey(),
-                                 request_spool, request_preset, &request_id)
-      : -1;
+    int code = -1;
+    if (wifiManagerIsConnected()) {
+      loadingOverlayShow(T(STR_LABEL_PC_PENDING));
+      {
+        HttpStall stall(loadingOverlayProgress);
+        code = filamanRequestLabelPrint(backendBaseUrl(), filamanApiKey(),
+                                       request_spool, request_preset, &request_id);
+      }
+      loadingOverlayHide();
+    }
     switch (code) {
       case 201: setStatus(T(STR_LABEL_PC_QUEUED)); break;
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;

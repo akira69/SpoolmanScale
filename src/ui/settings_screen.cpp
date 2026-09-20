@@ -11,7 +11,7 @@
 #include "lang.h"
 #include "scale_menu.h"
 #include "services/ota_state.h"
-#include "services/prefs_store.h"
+#include "services/label_printer.h"
 #include "system_screen.h"
 #include "theme.h"
 #include "ui_common.h"
@@ -56,7 +56,7 @@ void buildSettingsScreen() {
   lv_obj_center(lbl_x);
   lv_obj_add_event_cb(btn_x, [](lv_event_t *e){ logSD("BTN: Close -> Main"); showMainScreen(); }, LV_EVENT_CLICKED, NULL);
 
-  const bool label_print = backendIsFilaMan() && !prefsGetString("m220_addr").isEmpty();
+  const bool label_print = backendIsFilaMan() && labelPrinterConfigured(labelPrinterLoadConfig());
   // Names the active backend, so it is copied through backendText first.
   char conn_sub[40];
   backendText(T(STR_TILE_CONN_SUB), conn_sub, sizeof(conn_sub));
