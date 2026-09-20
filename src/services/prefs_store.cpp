@@ -220,8 +220,14 @@ bool prefsPutBool(const char* key, bool value) {
 static bool prefsWriteString(const char* key, const char* value) {
   Preferences prefs;
   if (!prefsOpen(prefs, key)) return false;
-  const bool ok = prefs.putString(key, value) > 0 || (value && !value[0]);
+  bool ok = prefs.putString(key, value) > 0;
   prefs.end();
+  // putString also returns zero on a successful empty write. Verify persisted state.
+  if (!ok && value && !value[0]) {
+    if (!prefsOpen(prefs, key)) return false;
+    ok = prefs.isKey(key) && prefs.getString(key, "?").isEmpty();
+    prefs.end();
+  }
   if (!ok) prefsReportFail("write", key);
   return ok;
 }
