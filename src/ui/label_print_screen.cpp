@@ -65,6 +65,7 @@ void addPresetRow(int id, const char* name) {
   lv_obj_t* label = lv_label_create(row);
   if (id) lv_label_set_text_fmt(label, "#%d  %s", id, name);
   else lv_label_set_text(label, name);
+  lv_obj_set_style_text_color(label, lv_color_hex(selected ? UI_COL_ACCENT : UI_COL_INK_2), 0);
   lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
   lv_obj_set_width(label, 360);
   lv_obj_center(label);
@@ -96,6 +97,7 @@ void fillPresetList() {
       }, LV_EVENT_CLICKED, (void*)(intptr_t)group);
       lv_obj_t* label = lv_label_create(row);
       lv_label_set_text_fmt(label, "%s  (%u)", kPresetGroups[group], (unsigned)count);
+      lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
       lv_obj_center(label);
     }
   } else {
@@ -117,6 +119,7 @@ void fillPresetList() {
       lv_obj_t* label = lv_label_create(row);
       lv_label_set_text_fmt(label, "%s %u/%u", direction < 0 ? "<" : ">",
                             (unsigned)(preset_page_index + 1), (unsigned)pages);
+      lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
       lv_obj_center(label);
     };
     if (preset_page_index) addPageButton(-1);
@@ -178,6 +181,7 @@ void buildPresetScreen() {
   lv_obj_add_event_cb(refresh, [](lv_event_t*) { fetch_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* refresh_label = lv_label_create(refresh);
   lv_label_set_text(refresh_label, T(STR_LABEL_REFRESH));
+  lv_obj_set_style_text_color(refresh_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(refresh_label);
 
   status = lv_label_create(screen);
@@ -281,6 +285,7 @@ void buildPreviewScreen() {
   lv_obj_add_event_cb(change, [](lv_event_t*) { change_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* change_label = lv_label_create(change);
   lv_label_set_text(change_label, T(STR_LABEL_CHANGE_PRESET));
+  lv_obj_set_style_text_color(change_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(change_label);
 
   status = lv_label_create(screen);
@@ -299,6 +304,7 @@ void buildPreviewScreen() {
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* pc_label = lv_label_create(pc_button);
   lv_label_set_text(pc_label, T(STR_LABEL_PC_OPEN));
+  lv_obj_set_style_text_color(pc_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(pc_label);
   lv_obj_add_state(pc_button, LV_STATE_DISABLED);
 
@@ -311,6 +317,7 @@ void buildPreviewScreen() {
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* printer_label = lv_label_create(printer_button);
   lv_label_set_text(printer_label, T(STR_LABEL_M220_PRINT));
+  lv_obj_set_style_text_color(printer_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(printer_label);
   lv_obj_add_state(printer_button, LV_STATE_DISABLED);
 

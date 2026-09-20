@@ -65,6 +65,7 @@ void buildScreen() {
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* prev_text = lv_label_create(prev);
   lv_label_set_text(prev_text, LV_SYMBOL_LEFT);
+  lv_obj_set_style_text_color(prev_text, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(prev_text);
 
   lv_obj_t* next = lv_btn_create(screen);
@@ -76,6 +77,7 @@ void buildScreen() {
   }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* next_text = lv_label_create(next);
   lv_label_set_text(next_text, LV_SYMBOL_RIGHT);
+  lv_obj_set_style_text_color(next_text, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(next_text);
 
   status = lv_label_create(screen);
@@ -134,6 +136,7 @@ void fetchSpools() {
     }, LV_EVENT_CLICKED, (void*)(intptr_t)id);
     lv_obj_t* label = lv_label_create(row);
     lv_label_set_text_fmt(label, "#%d  %s  %s", id, material, name);
+    lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
     lv_obj_set_width(label, 420);
     lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
     lv_obj_center(label);

@@ -72,9 +72,12 @@ void updateHeaderStatus() {
     else
       lv_obj_add_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
   }
-  if (lbl_btn_more)
-    lv_label_set_text(lbl_btn_more,
-      backendIsFilaMan() && !tag_present ? T(STR_SPOOLS_TITLE) : T(STR_BTN_MORE_INFO));
+  if (lbl_btn_more) {
+    lv_label_set_text(lbl_btn_more, T(STR_BTN_MORE_INFO));
+    lv_obj_t* button = lv_obj_get_parent(lbl_btn_more);
+    if (tag_present) lv_obj_clear_flag(button, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(button, LV_OBJ_FLAG_HIDDEN);
+  }
 
   if (lbl_hdr_nfc) {
     lv_label_set_text(lbl_hdr_nfc, nfc_ok ? "NFC" : "NFC!");

@@ -27,7 +27,6 @@
 #include "ui/header_status.h"
 #include "ui/main_screen_helpers.h"
 #include "ui/more_info_screen.h"
-#include "ui/manual_spool_screen.h"
 #include "ui/settings_screen.h"
 #include "ui/spool_flow.h"
 #include "ui/theme.h"
@@ -440,8 +439,7 @@ void buildUI() {
   lv_obj_set_style_radius(btn_more, 6, 0);
   lv_obj_set_style_shadow_width(btn_more, 0, 0);
   lv_obj_add_event_cb(btn_more, [](lv_event_t *e){
-    if (backendIsFilaMan() && !tag_present) requestManualSpoolScreen();
-    else showMoreInfoScreen();
+    if (tag_present) showMoreInfoScreen();
   }, LV_EVENT_CLICKED, NULL);
   lv_obj_t *lbl_more = lv_label_create(btn_more);
   lbl_btn_more = lbl_more;

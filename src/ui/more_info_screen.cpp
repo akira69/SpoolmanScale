@@ -30,6 +30,7 @@
 #include "ui/tag_write_popup.h"
 #include "ui/theme.h"
 #include "ui/label_print_screen.h"
+#include "ui/theme.h"
 #include "ui_common.h"
 
 
@@ -657,6 +658,7 @@ void buildMoreInfoScreen() {
     lv_obj_add_event_cb(btn_label, [](lv_event_t*) { requestLabelPreviewScreen(sm_id); }, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *label = lv_label_create(btn_label);
     lv_label_set_text(label, T(STR_LABEL_PRINT));
+    lv_obj_set_style_text_color(label, lv_color_hex(UI_COL_INK_2), 0);
     lv_obj_center(label);
   }
 
