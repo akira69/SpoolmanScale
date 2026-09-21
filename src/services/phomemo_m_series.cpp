@@ -153,7 +153,7 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
     if (!s_write_events) { fail("write queue unavailable."); break; }
     s_write_handle = write->getHandle();
     const size_t chunk = phomemoWriteChunk(client->getMTU());
-    const bool response = write->canWrite();
+    const bool response = !write->canWriteNoResponse();
     Serial.printf("%s BLE connected: MTU=%u chunk=%u response=%u raster=%ux%u (%u bytes) heap=%u largest=%u psram=%u\n", profile.name,
                   client->getMTU(), unsigned(chunk), unsigned(response),
                   unsigned(image.width), unsigned(image.height), unsigned(image.length),
