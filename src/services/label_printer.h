@@ -27,6 +27,8 @@ struct LabelPrinterConfig {
 struct LabelPrinterDevice { char name[32]; char address[18]; };
 using LabelPrinterProgressFn = void (*)();
 
+constexpr char LABEL_PRINTER_BLE_START_CRUMB[] = "label printer BLE start";
+
 size_t labelPrinterScan(const LabelPrinterConfig& selected,
                        LabelPrinterDevice* out, size_t capacity,
                        LabelPrinterProgressFn progress = nullptr);
@@ -38,6 +40,7 @@ const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model);
 LabelPrinterConfig labelPrinterLoadConfig();
 bool labelPrinterSaveConfig(const LabelPrinterConfig& config);
 bool labelPrinterConfigured(const LabelPrinterConfig& config);
+bool labelPrinterStartupCrash(const char* previous_crumb, bool panic_reset);
 uint16_t labelPrinterDotsForMm(uint16_t mm);
 uint16_t labelPrinterRasterWidth(LabelPrinterModel model, uint16_t media_width_mm);
 bool labelPrinterRasterFits(LabelPrinterModel model, const LabelRaster& image,

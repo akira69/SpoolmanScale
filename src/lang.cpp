@@ -890,6 +890,12 @@ const char* const STRINGS[][3] = {
     "Impossible de charger l'étiquette" },  // STR_LABEL_PRINTER_FAILED
   { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration.",
     "Pas de PSRAM pour l'étiquette. Vérifiez le matériel et la configuration." },  // STR_LABEL_PRINTER_NO_PSRAM
+  { "Drucker nicht erreichbar. Drucker prüfen und erneut auf Drucken tippen.", "Printer unavailable. Check it and tap Print to try again.",
+    "Imprimante indisponible. Vérifiez-la et touchez Imprimer pour réessayer." },  // STR_LABEL_PRINTER_CONNECT_RETRY
+  { "Bluetooth-Druckerproblem", "Bluetooth printer problem",
+    "Problème d’imprimante Bluetooth" },  // STR_LABEL_PRINTER_RECOVERY_TITLE
+  { "Bluetooth konnte nicht gestartet werden. Die Waage wurde neu gestartet. Drucklabels öffnen und erneut versuchen.", "Bluetooth could not start, so the scale restarted. Open Print Labels and try again.",
+    "Le Bluetooth n’a pas pu démarrer et la balance a redémarré. Ouvrez Imprimer des étiquettes et réessayez." },  // STR_LABEL_PRINTER_RECOVERY_TEXT
   { "Spulen", "Spools",
     "Bobines" },  // STR_SPOOLS_TITLE
   { "Suchen", "Search",

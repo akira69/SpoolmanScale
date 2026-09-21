@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <esp_system.h>
 #include <lvgl.h>
 #include <cmath>
 #include <cstring>
@@ -64,6 +65,7 @@
 #include "services/mdns_service.h"
 #include "services/backend.h"
 #include "services/breadcrumb.h"
+#include "services/label_printer.h"
 #include "services/diagnostics.h"
 #include "hardware/i2c_scan.h"
 #include "ui/diag_banner.h"
@@ -326,6 +328,8 @@ static unsigned long last_scale_ms = 0;
 static int  loc_popup_pending_id = -1;              // debounced popup: sm_id scheduled, fires after 1500ms
 static int  ams_popup_pending_id = -1;              // same, for the AMS question; answered first when both are due
 static int  pick_popup_pending_id = -1;             // same, for the AMS bay picker; only one of the three is ever set per backend
+static bool printer_recovery_checked = false;
+static bool printer_recovery_pending = false;
 
 void appLoop() {
   // Overwritten every pass, so a crumb from a marked section only stands while
@@ -343,6 +347,12 @@ void appLoop() {
   prefsDeferWrites(false);
   prefsFlush();
   handlePowerManagement();
+
+  if (!printer_recovery_checked) {
+    printer_recovery_checked = true;
+    printer_recovery_pending = labelPrinterStartupCrash(
+        crumbPrevious(), esp_reset_reason() == ESP_RST_PANIC);
+  }
 
   // ── Stack watermark of the loop task ─────────────────────
   // uxTaskGetStackHighWaterMark reports the lowest free stack seen since
@@ -795,6 +805,11 @@ void appLoop() {
   handleAmsViewDeferredActions();
   handleAmsDetailDeferredActions();
   handleTagViewDeferredActions();
+  if (!isInfoPopupOpen() && printer_recovery_pending) {
+    printer_recovery_pending = false;
+    showInfoPopup(STR_LABEL_PRINTER_RECOVERY_TITLE,
+                  STR_LABEL_PRINTER_RECOVERY_TEXT, INFO_WARN);
+  }
   // A request found no server, see server_reach.h. After every handler above,
   // so the popup comes up over whatever the failed action left on screen, and
   // the header badge turns red now instead of on the next health check. An

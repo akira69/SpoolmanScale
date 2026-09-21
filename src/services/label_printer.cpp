@@ -107,6 +107,11 @@ bool labelPrinterConfigured(const LabelPrinterConfig& config) {
   return config.address[0] != '\0';
 }
 
+bool labelPrinterStartupCrash(const char* previous_crumb, bool panic_reset) {
+  return panic_reset && previous_crumb &&
+         !strcmp(previous_crumb, LABEL_PRINTER_BLE_START_CRUMB);
+}
+
 size_t labelPrinterScan(const LabelPrinterConfig& selected,
                        LabelPrinterDevice* out, size_t capacity,
                        LabelPrinterProgressFn progress) {

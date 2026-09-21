@@ -132,6 +132,9 @@ int main() {
   media.content_width = 480;
   assert(!labelPrinterRasterFits(LabelPrinterModel::M220, media, 40, 30));
   assert(labelPrinterRasterWidth(LabelPrinterModel::M110, 40) == 384);
+  assert(labelPrinterStartupCrash("label printer BLE start", true));
+  assert(!labelPrinterStartupCrash("label printer BLE start", false));
+  assert(!labelPrinterStartupCrash("label printer connect", true));
   uint8_t pixels[48 * 240] = {};
   LabelRaster raster{384, 240, 48, pixels, sizeof(pixels), 320, false};
   assert(labelPrinterRasterFits(LabelPrinterModel::M110, raster, 40, 30));

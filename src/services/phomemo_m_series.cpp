@@ -9,6 +9,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include "lang.h"
+#include "services/breadcrumb.h"
+
 namespace {
 QueueHandle_t s_write_events = nullptr;
 QueueHandle_t s_disconnect_events = nullptr;
@@ -115,7 +118,9 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
                 unsigned(ESP.getFreeHeap()),
                 unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
                 unsigned(ESP.getFreePsram()));
+  crumbSet(LABEL_PRINTER_BLE_START_CRUMB);
   BLEDevice::init("");
+  crumbSet("label printer BLE ready");
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
   if (!s_connect_events) s_connect_events = xQueueCreate(2, sizeof(uint8_t));
@@ -138,7 +143,7 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
       const uint8_t expected = client->getConnId() != ESP_GATT_IF_NONE
           ? ESP_GATTC_OPEN_EVT : ESP_GATTC_REG_EVT;
       connect_completed = connectEventComplete(expected);
-      fail("Could not connect to printer.");
+      fail(T(STR_LABEL_PRINTER_CONNECT_RETRY));
       break;
     }
     connected = true;
