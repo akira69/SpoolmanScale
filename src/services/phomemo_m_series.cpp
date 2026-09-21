@@ -105,6 +105,8 @@ size_t phomemoMSeriesScan(LabelPrinterDevice* out, size_t capacity,
   }
   scan->setAdvertisedDeviceCallbacks(nullptr);
   scan->clearResults();
+  // Keep controller memory reusable for the next scan or print.
+  BLEDevice::deinit(false);
   return collector.count;
 }
 
@@ -128,7 +130,11 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
   if (!s_connect_events) s_connect_events = xQueueCreate(2, sizeof(uint8_t));
-  if (!s_disconnect_events || !s_connect_events) { delete client; return fail("BLE queue unavailable."); }
+  if (!s_disconnect_events || !s_connect_events) {
+    delete client;
+    BLEDevice::deinit(false);
+    return fail("BLE queue unavailable.");
+  }
   xQueueReset(s_disconnect_events);
   xQueueReset(s_connect_events);
   s_gatt_if = ESP_GATT_IF_NONE;
@@ -251,5 +257,6 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
     return fail("disconnect timed out. Restart scale before retrying.");
   }
   delete client;
+  BLEDevice::deinit(false);
   return ok;
 }
