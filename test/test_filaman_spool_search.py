@@ -77,6 +77,7 @@ class WiFiClient : public Stream {
 class HTTPClient {
  public:
   bool begin(const String& url) { last_url = url; return true; }
+  void setConnectTimeout(uint32_t) {}
   void setTimeout(uint32_t) {}
   void setReuse(bool) {}
   void addHeader(const char* key, const char* value) {
