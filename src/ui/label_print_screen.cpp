@@ -33,7 +33,7 @@ lv_obj_t* list = nullptr;
 lv_obj_t* status = nullptr;
 lv_obj_t* pc_button = nullptr;
 lv_obj_t* printer_button = nullptr;
-FilaManLabelPreset presets[kPresetCapacity];
+FilaManLabelPreset* presets = nullptr;
 size_t preset_count = 0;
 LabelRaster preview{};
 FilaManPrintPending pc_request;
@@ -51,6 +51,19 @@ bool refresh_rows_pending = false;
 bool print_pending = false;
 int preset_selection_pending = -1;
 LabelPrinterConfig preview_printer{};
+int selected_preset_id = 0;
+
+void freePresets() {
+  free(presets);
+  presets = nullptr;
+  preset_count = 0;
+}
+
+void setSelectedPreset(int id) {
+  if (id == selected_preset_id) return;
+  selected_preset_id = id;
+  prefsPutInt("label_preset", id);
+}
 
 void setStatus(const char* message) {
   if (status) lv_label_set_text(status, message);
@@ -69,7 +82,7 @@ void setMediaMismatch(const LabelPrinterConfig& printer) {
 
 void addPresetRow(int id, const char* name) {
   if (!lvPoolHasRoomForRow()) return;
-  const bool selected = id == prefsGetInt("label_preset", 0);
+  const bool selected = id == selected_preset_id;
   lv_obj_t* row = lv_btn_create(list);
   lv_obj_set_size(row, 392, 42);
   styleListRow(row, selected);
@@ -147,12 +160,20 @@ void fillPresetList() {
   }
 }
 
-bool fetchAndSyncPresets(bool keep_rows) {
+void fetchPresets() {
   if (!wifiManagerIsConnected()) {
-    if (keep_rows) setStatus(T(STR_LABEL_NO_WIFI));
-    return false;
+    setStatus(T(STR_NO_WIFI));
+    return;
   }
   loadingOverlayShow(T(STR_LABEL_LOADING));
+  if (!presets)
+    presets = static_cast<FilaManLabelPreset*>(
+        heap_caps_malloc(sizeof(FilaManLabelPreset) * kPresetCapacity, MALLOC_CAP_SPIRAM));
+  if (!presets) {
+    loadingOverlayHide();
+    setStatus(T(STR_LABEL_PRINTER_NO_PSRAM));
+    return;
+  }
   int code;
   bool selection_known = false;
   {
@@ -164,39 +185,29 @@ bool fetchAndSyncPresets(bool keep_rows) {
   loadingOverlayHide();
   if (code != 200) {
     preset_count = 0;
-    if (keep_rows) {
-      fillPresetList();
-      switch (code) {
-        case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
-        case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
-        default: setHttpError(T(STR_LABEL_LOAD_FAIL), code); break;
-      }
+    fillPresetList();
+    switch (code) {
+      case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
+      case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
+      default: setHttpError(T(STR_LABEL_LOAD_FAIL), code); break;
     }
-    return false;
+    return;
   }
-  const int local_id = prefsGetInt("label_preset", 0);
+  const int local_id = selected_preset_id;
   const int resolved_id = filamanResolvedPresetId(
       presets, preset_count, selection_known, local_id);
-  if (resolved_id != local_id) prefsPutInt("label_preset", resolved_id);
-  if (!keep_rows) preset_count = 0;
-  else {
-    if (local_id && !resolved_id && !selection_known)
-      setStatus(T(STR_LABEL_PRESET_REMOVED));
-    else if (!preset_count) setStatus(T(STR_LABEL_NONE));
-    else setStatus("");
-    fillPresetList();
-  }
-  return true;
-}
-
-void fetchPresets() {
-  if (!screen || !preset_page) return;
-  fetchAndSyncPresets(true);
+  setSelectedPreset(resolved_id);
+  if (local_id && !resolved_id && !selection_known)
+    setStatus(T(STR_LABEL_PRESET_REMOVED));
+  else if (!preset_count) setStatus(T(STR_LABEL_NONE));
+  else setStatus("");
+  fillPresetList();
 }
 
 void buildPresetScreen() {
   releaseScreen(&screen);
   filamanFreeLabel(&preview);
+  selected_preset_id = prefsGetInt("label_preset", 0);
   list = status = pc_button = printer_button = nullptr;
   preset_page = true;
   preset_group = -1;
@@ -210,7 +221,7 @@ void buildPresetScreen() {
   styleOutlineButton(refresh);
   lv_obj_add_event_cb(refresh, [](lv_event_t*) { fetch_pending = true; }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t* refresh_label = lv_label_create(refresh);
-  lv_label_set_text(refresh_label, T(STR_LABEL_REFRESH));
+  lv_label_set_text(refresh_label, T(STR_W_SESSION_REFRESH));
   lv_obj_set_style_text_color(refresh_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_center(refresh_label);
 
@@ -268,8 +279,7 @@ bool drawPreview() {
 
 void fetchPreview() {
   if (!screen || preset_page) return;
-  if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
-  fetchAndSyncPresets(false);
+  if (!wifiManagerIsConnected()) { setStatus(T(STR_NO_WIFI)); return; }
   preview_printer = labelPrinterLoadConfig();
   const uint16_t width = labelPrinterRasterWidth(preview_printer.model,
                                                 preview_printer.media_width_mm);
@@ -280,9 +290,13 @@ void fetchPreview() {
   bool drawn = false;
   {
     HttpStall stall(loadingOverlayProgress);
+    int resolved_preset_id = -1;
     code = filamanFetchMonoLabel(backendBaseUrl(), filamanApiKey(),
-                                spool_id, prefsGetInt("label_preset", 0),
-                                width, orientation, &preview);
+                                spool_id, 0, width, orientation, &preview,
+                                &resolved_preset_id);
+    if (code == 200 && resolved_preset_id >= 0) {
+      setSelectedPreset(resolved_preset_id);
+    }
     if (code == 200) drawn = drawPreview();
   }
   loadingOverlayHide();
@@ -314,6 +328,8 @@ void fetchPreview() {
 void buildPreviewScreen() {
   releaseScreen(&screen);
   filamanFreeLabel(&preview);
+  freePresets();
+  selected_preset_id = prefsGetInt("label_preset", 0);
   list = status = pc_button = printer_button = nullptr;
   preset_page = false;
   screen = buildOverlayScreen();
@@ -347,7 +363,7 @@ void buildPreviewScreen() {
   styleOutlineButton(pc_button);
   lv_obj_set_style_pad_all(pc_button, 4, 0);
   lv_obj_add_event_cb(pc_button, [](lv_event_t*) {
-    const int preset_id = prefsGetInt("label_preset", 0);
+    const int preset_id = selected_preset_id;
     if (spool_id > 0 && preset_id >= 0 && pc_request.request(spool_id, preset_id))
       setStatus(T(STR_LABEL_PC_PENDING));
   }, LV_EVENT_CLICKED, nullptr);
@@ -356,7 +372,7 @@ void buildPreviewScreen() {
   lv_obj_set_style_text_color(pc_label, lv_color_hex(UI_COL_INK_2), 0);
   lv_obj_set_style_text_font(pc_label, UI_FONT_SMALL, 0);
   lv_obj_center(pc_label);
-  if (spool_id <= 0 || prefsGetInt("label_preset", 0) < 0)
+  if (spool_id <= 0 || selected_preset_id < 0)
     lv_obj_add_state(pc_button, LV_STATE_DISABLED);
 
   printer_button = lv_btn_create(screen);
@@ -441,14 +457,14 @@ void handleLabelPrintDeferredActions() {
       loadingOverlayHide();
     }
     if (code == 204) {
-      prefsPutInt("label_preset", selected_id);
+      setSelectedPreset(selected_id);
       fillPresetList();
       setStatus("");
     } else if (code == 401) setStatus(T(STR_LABEL_PC_KEY));
     else if (code == 403) setStatus(T(STR_LABEL_PC_SCOPE));
     else if (wifiManagerIsConnected())
       setHttpError(T(STR_LABEL_LOAD_FAIL), code);
-    else setStatus(T(STR_LABEL_NO_WIFI));
+    else setStatus(T(STR_NO_WIFI));
   }
   if (refresh_rows_pending) {
     refresh_rows_pending = false;
@@ -508,7 +524,7 @@ void handleLabelPrintDeferredActions() {
       case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
       case 404: setStatus(T(STR_LABEL_PC_MISSING)); break;
       case 422: setStatus(T(STR_LABEL_PC_INVALID)); break;
-      default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_PC_FAILED : STR_LABEL_NO_WIFI)); break;
+      default: setStatus(T(wifiManagerIsConnected() ? STR_LABEL_PC_FAILED : STR_NO_WIFI)); break;
     }
   }
 }
@@ -517,6 +533,7 @@ void hideLabelPrintOverlays() {
   pc_request.cancel();
   releaseScreen(&screen);
   filamanFreeLabel(&preview);
+  freePresets();
   list = status = pc_button = printer_button = nullptr;
   open_pending = settings_pending = change_pending = back_pending = false;
   fetch_pending = refresh_rows_pending = print_pending = false;

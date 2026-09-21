@@ -110,13 +110,13 @@ int filamanListLabelPresets(const char* base_url, const char* api_key,
 
   const int declared = http.getSize();
   if (declared > FILAMAN_LABEL_PRESET_JSON_MAX) { http.end(); return -2; }
-  char* body = (char*)heap_caps_malloc(FILAMAN_LABEL_PRESET_JSON_MAX + 1, MALLOC_CAP_SPIRAM);
+  const size_t body_capacity = declared >= 0 ? size_t(declared) : FILAMAN_LABEL_PRESET_JSON_MAX;
+  char* body = (char*)heap_caps_malloc(body_capacity + 1, MALLOC_CAP_SPIRAM);
   if (!body) { http.end(); return -2; }
   size_t used = 0;
   WiFiClient* stream = http.getStreamPtr();
-  while ((http.connected() || stream->available()) && used < FILAMAN_LABEL_PRESET_JSON_MAX) {
-    const size_t room = declared >= 0 ? size_t(declared) - used
-                                      : FILAMAN_LABEL_PRESET_JSON_MAX - used;
+  while ((http.connected() || stream->available()) && used < body_capacity) {
+    const size_t room = body_capacity - used;
     if (!room) break;
     const size_t got = stream->readBytes(body + used, room);
     if (!got) break;
@@ -124,7 +124,7 @@ int filamanListLabelPresets(const char* base_url, const char* api_key,
   }
   body[used] = '\0';
   const bool oversized = (declared >= 0 && declared != (int)used) ||
-                         (declared < 0 && used == FILAMAN_LABEL_PRESET_JSON_MAX);
+                         (declared < 0 && used == body_capacity);
   http.end();
   if (oversized) { free(body); return -2; }
 

@@ -104,7 +104,8 @@ class HTTPClient {
     header("esp_heap_caps.h", r'''
 #include <stdlib.h>
 #define MALLOC_CAP_SPIRAM 0
-inline void* heap_caps_malloc(size_t n, int) { return malloc(n); }
+extern size_t last_allocation;
+inline void* heap_caps_malloc(size_t n, int) { last_allocation = n; return malloc(n); }
 inline void* heap_caps_realloc(void* p, size_t n, int) { return realloc(p, n); }
 inline void heap_caps_free(void* p) { free(p); }
 ''')
@@ -121,6 +122,7 @@ inline void addApiKey(HTTPClient&, const char*) {}
 #include "services/filaman_api.h"
 std::string last_url, last_body, last_content_type, response_body;
 int response_code = 200;
+size_t last_allocation = 0;
 bool sd_verbose = false;
 int main() {
   JsonDocument doc;
@@ -138,6 +140,16 @@ int main() {
   assert(filamanSelectLabelPreset("http://fila", "key", 0, 8000) == 204);
   assert(last_body == "{\"preset_id\":null}");
   assert(filamanSelectLabelPreset("http://fila", "key", -1, 8000) == -1);
+
+  response_code = 200;
+  response_body = "[{\"id\":7,\"name\":\"Plain\",\"selected\":true}]";
+  FilaManLabelPreset presets[1];
+  size_t count = 0;
+  bool selection_known = false;
+  assert(filamanListLabelPresets("http://fila", "key", presets, 1, &count,
+                                 &selection_known, 8000) == 200);
+  assert(last_allocation == response_body.size() + 1);
+  assert(count == 1 && presets[0].id == 7 && selection_known);
 }
 '''
     result = subprocess.run(

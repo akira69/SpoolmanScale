@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <esp_heap_caps.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,6 +23,19 @@ bool parseHeaderNumber(const String& value, uint16_t* out) {
   *out = n;
   return true;
 }
+
+bool parseHeaderId(const String& value, int* out) {
+  if (!value.length()) return false;
+  unsigned long n = 0;
+  for (size_t i = 0; i < value.length(); ++i) {
+    const char c = value[i];
+    if (c < '0' || c > '9') return false;
+    n = n * 10 + c - '0';
+    if (n > INT_MAX) return false;
+  }
+  *out = int(n);
+  return true;
+}
 }
 
 void filamanFreeLabel(LabelRaster* image) {
@@ -32,10 +46,11 @@ void filamanFreeLabel(LabelRaster* image) {
 
 int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_id,
                           int preset_id, uint16_t requested_width, const char* orientation,
-                          LabelRaster* out,
+                          LabelRaster* out, int* resolved_preset_id,
                           uint32_t timeout_ms) {
   if (!out) return -1;
   *out = {};
+  if (resolved_preset_id) *resolved_preset_id = -1;
   if (!base_url || strlen(base_url) <= 7 || !api_key || !api_key[0] ||
       spool_id <= 0 || preset_id < 0 || requested_width < 384 ||
       (!orientation || (strcmp(orientation, "landscape") && strcmp(orientation, "portrait"))) ||
@@ -50,14 +65,16 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
   if (!http.begin(url)) return -1;
   http.setTimeout(timeout_ms);
   http.setReuse(false);
-  const char* headers[] = {"X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated"};
-  http.collectHeaders(headers, 6);
+  const char* headers[] = {"X-Preset-Id", "X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated"};
+  http.collectHeaders(headers, 7);
   addApiKey(http, api_key);
   const int code = http.GET();
   if (code != 200) { http.end(); return code; }
 
   LabelRaster image{};
-  const bool headers_ok = parseHeaderNumber(http.header("X-Image-Width"), &image.width) &&
+  int header_preset_id = 0;
+  const bool headers_ok = parseHeaderId(http.header("X-Preset-Id"), &header_preset_id) &&
+                          parseHeaderNumber(http.header("X-Image-Width"), &image.width) &&
                           parseHeaderNumber(http.header("X-Image-Height"), &image.height) &&
                           parseHeaderNumber(http.header("X-Row-Bytes"), &image.row_bytes) &&
                           parseHeaderNumber(http.header("X-Content-Width"), &image.content_width) &&
@@ -91,5 +108,6 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
   http.end();
   if (!valid) { filamanFreeLabel(&image); return -2; }
   *out = image;
+  if (resolved_preset_id) *resolved_preset_id = header_preset_id;
   return code;
 }

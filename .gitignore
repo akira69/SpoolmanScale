@@ -6,6 +6,8 @@
 !src/**
 !tests/
 !tests/**
+!test/
+!test/**
 !webflasher/
 !webflasher/**
 !.github/
@@ -40,3 +42,7 @@ images/images_not_for_github/
 !REFACTOR_PLAN.md
 !index.html
 !.gitignore
+
+# Local planning and agent execution records never ship with firmware.
+.superpowers/
+docs/superpowers/

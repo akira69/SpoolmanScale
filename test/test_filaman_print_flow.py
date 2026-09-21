@@ -164,22 +164,28 @@ size_t bytes_left=0;
 int declared=0, progress_reads=0;
 bool progress_active=false;
 int main() {
-  headers={{"X-Image-Width","384"},{"X-Image-Height","240"},{"X-Row-Bytes","48"},
+  headers={{"X-Preset-Id","42"},{"X-Image-Width","384"},{"X-Image-Height","240"},{"X-Row-Bytes","48"},
            {"X-Content-Width","320"},{"X-Rotated","0"},{"X-Bit-Order","msb-black-1"}};
   declared=48*240;
   LabelRaster image{};
   for (bool active: {false,true}) {
     progress_active=active; progress_reads=0; bytes_left=declared;
-    assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image)==200);
+    int resolved=-1;
+    assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&resolved)==200);
+    assert(resolved==42);
     assert(seen_url=="http://fila/api/v1/labels/spool/123/render?format=mono1&dpi=203&align=right&orientation=landscape&width=384&preset_id=7");
     assert(progress_reads==(active ? 1 : 0));
     filamanFreeLabel(&image);
     for (int delta: {-1,1}) {
       bytes_left=declared+delta;
-      assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"portrait",&image)==-2);
+      assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"portrait",&image,&resolved)==-2);
       assert(!image.pixels);
     }
   }
+  headers.erase("X-Preset-Id"); bytes_left=declared;
+  int resolved=99;
+  assert(filamanFetchMonoLabel("http://fila","key",123,0,384,"landscape",&image,&resolved)==-2);
+  assert(resolved==-1);
 }
 '''
     result = subprocess.run(['g++','-std=c++11',f'-I{d}',f'-I{root / "src"}','-x','c++','-',str(root/'src/services/filaman_labels.cpp'),'-o',str(d/'raster-check')],input=source,text=True,capture_output=True)

@@ -205,7 +205,7 @@ void fetchSpools() {
   if (!screen || !list || !backendIsFilaMan()) return;
   lv_obj_clean(list);
   page_complete = false;
-  if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
+  if (!wifiManagerIsConnected()) { setStatus(T(STR_NO_WIFI)); return; }
   loadingOverlayShow(T(STR_SPOOLS_LOADING));
 
   SpiRamAllocator alloc;
@@ -290,7 +290,7 @@ void handleManualSpoolDeferredActions() {
     const int id = selected_id;
     selected_id = 0;
     if (tag_present) { setStatus(T(STR_SPOOLS_REMOVE_TAG)); return; }
-    if (!wifiManagerIsConnected()) { setStatus(T(STR_LABEL_NO_WIFI)); return; }
+    if (!wifiManagerIsConnected()) { setStatus(T(STR_NO_WIFI)); return; }
     loadingOverlayShow(T(STR_SPOOLS_OPENING));
     cancelRemoteTaglessAdoption();
     clearTagDisplay();

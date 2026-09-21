@@ -16,6 +16,8 @@ static const LabelPrinterProfile kM110 = {
   LabelPrinterModel::M110, "M110", 40, 30, 20, 48, 10, 150, 384, 384, true
 };
 bool s_reachable = false;
+LabelPrinterConfig s_config{};
+bool s_config_loaded = false;
 
 bool dimensionsValid(const LabelPrinterProfile& profile, uint16_t width, uint16_t length) {
   return profile.model != LabelPrinterModel::NONE &&
@@ -76,6 +78,7 @@ const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model) {
 }
 
 LabelPrinterConfig labelPrinterLoadConfig() {
+  if (s_config_loaded) return s_config;
   LabelPrinterConfig config{};
   if (!prefsGetBool("printer_mig", false)) {
     config.model = LabelPrinterModel::M220;
@@ -90,7 +93,9 @@ LabelPrinterConfig labelPrinterLoadConfig() {
     config.media_width_mm = prefsGetInt("printer_w", kM220.default_width_mm);
     config.media_length_mm = prefsGetInt("printer_h", kM220.default_length_mm);
   }
-  return normalizedConfig(config);
+  s_config = normalizedConfig(config);
+  s_config_loaded = true;
+  return s_config;
 }
 
 bool labelPrinterSaveConfig(const LabelPrinterConfig& input) {
@@ -101,7 +106,12 @@ bool labelPrinterSaveConfig(const LabelPrinterConfig& input) {
   saved = prefsPutString("printer_name", config.name) && saved;
   saved = prefsPutInt("printer_w", config.media_width_mm) && saved;
   saved = prefsPutInt("printer_h", config.media_length_mm) && saved;
-  return saved && prefsPutBool("printer_mig", true);
+  saved = saved && prefsPutBool("printer_mig", true);
+  if (saved) {
+    s_config = config;
+    s_config_loaded = true;
+  }
+  return saved;
 }
 
 bool labelPrinterConfigured(const LabelPrinterConfig& config) {
@@ -111,6 +121,10 @@ bool labelPrinterConfigured(const LabelPrinterConfig& config) {
 bool labelPrinterReachable() { return s_reachable; }
 
 void labelPrinterSetReachable(bool reachable) { s_reachable = reachable; }
+
+#ifdef UNIT_TEST
+void labelPrinterResetConfigCache() { s_config_loaded = false; }
+#endif
 
 bool labelPrinterStartupCrash(const char* previous_crumb, bool panic_reset) {
   return panic_reset && previous_crumb &&
@@ -122,10 +136,10 @@ size_t labelPrinterScan(const LabelPrinterConfig& selected,
                        LabelPrinterProgressFn progress) {
   const size_t count = phomemoMSeriesScan(out, capacity, selected, progress);
   if (labelPrinterConfigured(selected)) {
-    s_reachable = false;
+    labelPrinterSetReachable(false);
     for (size_t i = 0; i < count; ++i)
       if (!strcmp(out[i].address, selected.address)) {
-        s_reachable = true;
+        labelPrinterSetReachable(true);
         break;
       }
   }
@@ -150,9 +164,10 @@ bool labelPrinterPrint(const LabelPrinterConfig& config, const LabelRaster& imag
     if (error_size) snprintf(error, error_size, "%s", message);
     return false;
   }
-  s_reachable = phomemoMSeriesPrint(config.model, config.address, image,
-                                    error, error_size, progress);
-  return s_reachable;
+  const bool printed = phomemoMSeriesPrint(config.model, config.address, image,
+                                           error, error_size, progress);
+  labelPrinterSetReachable(printed);
+  return printed;
 }
 
 uint16_t labelPrinterDotsForMm(uint16_t mm) {

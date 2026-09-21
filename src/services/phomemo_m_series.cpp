@@ -73,15 +73,18 @@ class MSeriesScanCollector : public BLEAdvertisedDeviceCallbacks {
     LabelPrinterDevice candidate{};
     snprintf(candidate.name, sizeof(candidate.name), "%s", device.getName().c_str());
     snprintf(candidate.address, sizeof(candidate.address), "%s", device.getAddress().toString().c_str());
+    if (selected.address[0] && !strcmp(candidate.address, selected.address)) selected_found = true;
     labelPrinterConsiderDevice(out, &count, capacity, candidate, selected);
   }
 
   size_t count = 0;
+  bool selectedFound() const { return selected_found; }
 
  private:
   LabelPrinterDevice* out;
   size_t capacity;
   const LabelPrinterConfig& selected;
+  bool selected_found = false;
 };
 }
 
@@ -98,6 +101,7 @@ size_t phomemoMSeriesScan(LabelPrinterDevice* out, size_t capacity,
   for (unsigned interval = 0; interval < 8; ++interval) {
     scan->start(1, false);
     if (progress) progress();
+    if (labelPrinterConfigured(selected) && collector.selectedFound()) break;
   }
   scan->setAdvertisedDeviceCallbacks(nullptr);
   scan->clearResults();
@@ -120,6 +124,7 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
                 unsigned(ESP.getFreePsram()));
   crumbSet(LABEL_PRINTER_BLE_START_CRUMB);
   BLEDevice::init("");
+  BLEDevice::setMTU(PHOMEMO_PREFERRED_MTU);
   crumbSet("label printer BLE ready");
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));

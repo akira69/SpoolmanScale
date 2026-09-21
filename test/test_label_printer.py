@@ -40,7 +40,8 @@ bool prefsPutBool(const char*, bool);
 static std::map<std::string, int> ints;
 static std::map<std::string, std::string> strings;
 static std::map<std::string, bool> bools;
-void clearPrefs() { ints.clear(); strings.clear(); bools.clear(); }
+static int pref_reads = 0;
+void clearPrefs() { ints.clear(); strings.clear(); bools.clear(); labelPrinterResetConfigCache(); }
 void putLegacy(const char* name, const char* address, int width, int height) {
   strings["m220_name"] = name;
   strings["m220_addr"] = address;
@@ -48,12 +49,15 @@ void putLegacy(const char* name, const char* address, int width, int height) {
   ints["m220_media_h"] = height;
 }
 int prefsGetInt(const char* key, int fallback) {
+  ++pref_reads;
   const auto it = ints.find(key); return it == ints.end() ? fallback : it->second;
 }
 String prefsGetString(const char* key, const char* fallback) {
+  ++pref_reads;
   const auto it = strings.find(key); return it == strings.end() ? String(fallback) : String(it->second);
 }
 bool prefsGetBool(const char* key, bool fallback) {
+  ++pref_reads;
   const auto it = bools.find(key); return it == bools.end() ? fallback : it->second;
 }
 bool prefsPutInt(const char* key, int value) { ints[key] = value; return true; }
@@ -93,7 +97,11 @@ int main() {
   assert(fresh.model == LabelPrinterModel::M220);
   assert(!labelPrinterConfigured(fresh));
   assert(fresh.media_width_mm == 40 && fresh.media_length_mm == 30);
+  const int reads_after_load = pref_reads;
+  labelPrinterLoadConfig();
+  assert(pref_reads == reads_after_load);
 
+  clearPrefs();
   putLegacy("Q123456789", "7e:11:22:33:44:55", 40, 30);
   LabelPrinterConfig legacy = labelPrinterLoadConfig();
   assert(legacy.model == LabelPrinterModel::M220);
@@ -153,6 +161,7 @@ int main() {
   assert(!labelPrinterPrint(selected, raster, error, sizeof(error)));
   assert(!labelPrinterReachable());
   assert(print_calls == 2);
+
   auto rejected = [&](const LabelPrinterConfig& config, const LabelRaster& image) {
     error[0] = '\0';
     assert(!labelPrinterPrint(config, image, error, sizeof(error)));
@@ -241,7 +250,7 @@ int main() {
 }
 '''
     result = subprocess.run(
-        ["g++", "-std=c++11", f"-I{tmp}", f"-I{root / 'src'}", "-x", "c++", "-",
+        ["g++", "-std=c++11", "-DUNIT_TEST", f"-I{tmp}", f"-I{root / 'src'}", "-x", "c++", "-",
          str(root / "src/services/label_printer.cpp"), "-o", str(tmp / "check")],
         input=source, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr

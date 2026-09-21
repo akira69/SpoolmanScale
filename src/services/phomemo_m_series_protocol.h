@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+constexpr uint16_t PHOMEMO_PREFERRED_MTU = 185;
+
 inline std::array<uint8_t, 8> phomemoRasterHeader(uint16_t width, uint16_t height) {
   const uint16_t bytes = (width + 7) / 8;
   return {0x1d, 0x76, 0x30, 0x00, uint8_t(bytes), uint8_t(bytes >> 8),

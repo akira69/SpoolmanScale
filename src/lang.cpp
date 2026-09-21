@@ -842,14 +842,10 @@ const char* const STRINGS[][3] = {
     "Modèle d'étiquette" },  // STR_LABEL_PRESET_TITLE
   { "Standard-Label", "Default label",
     "Étiquette par défaut" },  // STR_LABEL_DEFAULT
-  { "Aktualisieren", "Refresh",
-    "Actualiser" },  // STR_LABEL_REFRESH
   { "Lade Vorlagen...", "Loading presets...",
     "Chargement des modèles..." },  // STR_LABEL_LOADING
   { "Keine Vorlagen gespeichert", "No saved presets",
     "Aucun modèle enregistré" },  // STR_LABEL_NONE
-  { "Kein WLAN", "No WiFi",
-    "Pas de WiFi" },  // STR_LABEL_NO_WIFI
   { "Vorlagen konnten nicht geladen werden", "Could not load presets",
     "Impossible de charger les modèles" },  // STR_LABEL_LOAD_FAIL
   { "Gespeicherte Vorlage wurde entfernt; Standard gewählt", "Saved preset was removed; default selected",
@@ -874,8 +870,6 @@ const char* const STRINGS[][3] = {
     "Rechercher une imprimante" },  // STR_LABEL_PRINTER_SCAN
   { "Drucken", "Print",
     "Imprimer" },  // STR_LABEL_PRINTER_PRINT
-  { "Kein Drucker gefunden", "No printer found",
-    "Aucune imprimante trouvée" },  // STR_LABEL_PRINTER_NONE
   { "Drucker auswählen", "Select a printer",
     "Sélectionner une imprimante" },  // STR_LABEL_PRINTER_SELECT
   { "Vorlage muss zum eingelegten %u x %u mm Label passen", "Preset must match the loaded %u x %u mm label",

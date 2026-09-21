@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as tmp:
     header('services/http_progress.h', '#include <stddef.h>\nextern bool progress_active; struct HttpStallTime {}; struct HttpStall { explicit HttpStall(void (*)(size_t)) { progress_active=true; } ~HttpStall() { progress_active=false; } };\n')
     header('ui/loading_overlay.h', 'void loadingOverlayShow(const char*); void loadingOverlayHide(); void loadingOverlayTick(); void loadingOverlayProgress(size_t);\n')
     header('app/app_state.h', 'extern bool sm_found; extern int sm_id; extern char cfg_wifi_ssid[33]; extern char cfg_wifi_password[65];\n')
-    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_LABEL_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_LABEL_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED, STR_LABEL_PREVIEW, STR_LABEL_CHANGE_PRESET, STR_LABEL_PRINTER_PRINT, STR_LABEL_PRINTER_SELECT, STR_LABEL_PRINTER_MEDIA, STR_LABEL_PRINTER_FETCH, STR_LABEL_PRINTER_SEND, STR_LABEL_PRINTER_SENT, STR_LABEL_PRINTER_FAILED, STR_LABEL_PRINTER_NO_PSRAM };\nextern int status_id; inline const char* T(int id) { status_id=id; return id==STR_LABEL_PRINTER_SEND ? "Sending to %s..." : "text"; }\n''')
+    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_W_SESSION_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED, STR_LABEL_PREVIEW, STR_LABEL_CHANGE_PRESET, STR_LABEL_PRINTER_PRINT, STR_LABEL_PRINTER_SELECT, STR_LABEL_PRINTER_MEDIA, STR_LABEL_PRINTER_FETCH, STR_LABEL_PRINTER_SEND, STR_LABEL_PRINTER_SENT, STR_LABEL_PRINTER_FAILED, STR_LABEL_PRINTER_NO_PSRAM };\nextern int status_id; inline const char* T(int id) { status_id=id; return id==STR_LABEL_PRINTER_SEND ? "Sending to %s..." : "text"; }\n''')
     header('services/backend.h', 'bool backendIsFilaMan(); const char* backendBaseUrl(); const char* filamanApiKey();\n')
     header('services/prefs_store.h', '#include <Arduino.h>\nint prefsGetInt(const char*,int); bool prefsPutInt(const char*,int); String prefsGetString(const char*); bool prefsPutString(const char*,const char*);\n')
     header('services/wifi_manager.h', 'bool wifiManagerIsConnected(); void wifiManagerBegin(const char*, const char*);\n')
@@ -60,6 +60,7 @@ int preset=7, posts=0, sent_spool=0, sent_preset=0, closed=0, status_id=0;
 int response=201, fetch_response=-1, preset_fetches=0, preset_response=200, content_delta=0;
 int selection_requests=0, selection_response=204, selected_request=-1, list_mode=0;
 int operations=0, last_list_operation=0, last_render_operation=0, last_render_preset=-1;
+int render_resolved=42, render_calls=0;
 int loading_depth=0, loading_shown=0, loading_hidden=0, print_calls=0;
 bool progress_active=false, thumbnail_fail=false, print_result=true;
 std::string loading_message;
@@ -111,10 +112,10 @@ int filamanSelectLabelPreset(const char*,const char*,int chosen,uint32_t) {
   return selection_response;
 }
 int filamanRequestLabelPrint(const char*,const char*,int spool,int chosen,int* id,uint32_t) { assert(loading_depth==1 && progress_active); ++posts; sent_spool=spool; sent_preset=chosen; *id=42; return response; }
-int filamanFetchMonoLabel(const char*,const char*,int,int chosen,uint16_t width,const char* orientation,LabelRaster* out,uint32_t) {
+int filamanFetchMonoLabel(const char*,const char*,int,int chosen,uint16_t width,const char* orientation,LabelRaster* out,int* resolved,uint32_t) {
   assert(loading_depth==1 && progress_active);
-  last_render_operation=++operations; last_render_preset=chosen;
-  assert(last_list_operation && last_list_operation<last_render_operation);
+  ++render_calls; last_render_operation=++operations; last_render_preset=chosen;
+  if (resolved) *resolved=render_resolved;
   static int fetches=0;
   if (!fetches++) assert(latestStatus()->text.empty());
   assert(width==(config.model==LabelPrinterModel::M220 ? 576 : 384));
@@ -130,8 +131,8 @@ void tap(int x,int y) { for (auto it=objects.rbegin();it!=objects.rend();++it) i
 int main() {
   fetch_response=200;
   int before=loading_shown;
-  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
-  assert(preset==42 && last_render_preset==42);
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
+  assert(preset_fetches==0 && preset==42 && last_render_preset==0);
   for (int x: {15,170,325}) {
     auto* button=at(x,268);
     assert(button->width==140 && button->height==44);
@@ -148,13 +149,13 @@ int main() {
   int before_refresh_fetch=preset_fetches;
   tap(320,8); handleLabelPrintDeferredActions();
   assert(preset_fetches==before_refresh_fetch+1);
-  lv_event_t select; select.user_data=(void*)42;
+  lv_event_t select; select.user_data=(void*)7;
   int before_selection_requests=selection_requests;
-  preset=7; labelPresetRowCb(&select);
-  assert(preset==7 && selection_requests==before_selection_requests);
+  labelPresetRowCb(&select);
+  assert(preset==42 && selection_requests==before_selection_requests);
   size_t before_refresh=objects.size();
   before=loading_shown; handleLabelPrintDeferredActions(); balanced(before);
-  assert(selection_requests==before_selection_requests+1 && selected_request==42 && preset==42);
+  assert(selection_requests==before_selection_requests+1 && selected_request==7 && preset==7);
   handleLabelPrintDeferredActions();
   assert(selection_requests==before_selection_requests+1);
   bool new_default=false, new_saved=false;
@@ -166,28 +167,33 @@ int main() {
   }
   assert(new_default && new_saved);
 
-  selection_response=500; select.user_data=(void*)7;
+  selection_response=500; select.user_data=(void*)42;
   labelPresetRowCb(&select);
-  assert(preset==42);
+  assert(preset==7);
   before=loading_shown; handleLabelPrintDeferredActions(); balanced(before);
-  assert(selected_request==7 && preset==42);
+  assert(selected_request==42 && preset==7);
   selection_response=204;
 
   select.user_data=nullptr; labelPresetRowCb(&select);
-  assert(preset==42);
+  assert(preset==7);
   before=loading_shown; handleLabelPrintDeferredActions(); balanced(before);
   assert(selected_request==0 && preset==0);
 
-  list_mode=1; preset=42; before=loading_shown;
+  list_mode=1; before=loading_shown;
   tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
   assert(preset==0);
-  list_mode=2; preset=7; before=loading_shown;
+  select.user_data=(void*)7; labelPresetRowCb(&select); handleLabelPrintDeferredActions();
+  assert(preset==7);
+  list_mode=2; before=loading_shown;
   tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
   assert(preset==7);
-  list_mode=3; preset=42; before=loading_shown;
+  select.user_data=(void*)42; labelPresetRowCb(&select); handleLabelPrintDeferredActions();
+  assert(preset==42);
+  list_mode=3; before=loading_shown;
   tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
   assert(preset==0);
-  preset_response=500; preset=42; before=loading_shown;
+  select.user_data=(void*)42; labelPresetRowCb(&select); handleLabelPrintDeferredActions();
+  preset_response=500; before=loading_shown;
   tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
   assert(preset==42);
   preset_response=200; list_mode=0; before=loading_shown;
@@ -197,19 +203,19 @@ int main() {
   tap(320,8); handleLabelPrintDeferredActions(); balanced(before);
   assert(preset==0);
 
-  list_mode=0; preset=7;
+  list_mode=0;
   tap(12,8); handleLabelPrintDeferredActions();
   handleLabelPrintDeferredActions();
-  assert(preset==42 && last_render_preset==42);
+  assert(preset==42 && last_render_preset==0);
   assert(posts==0);
-  preset=7; tap(15,268); tap(15,268); preset=8;
+  tap(15,268); tap(15,268); preset=8;
   handleLabelPrintDeferredActions();
-  assert(posts==1 && sent_spool==123 && sent_preset==7);
+  assert(posts==1 && sent_spool==123 && sent_preset==42);
   tap(15,268); hideLabelPrintOverlays(); handleLabelPrintDeferredActions();
   assert(posts==1);
   requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   wifi=false; tap(15,268); handleLabelPrintDeferredActions();
-  assert(status_id==STR_LABEL_NO_WIFI && posts==1);
+  assert(status_id==STR_NO_WIFI && posts==1);
   wifi=true;
   const int codes[]={401,403,404,422};
   const int statuses[]={STR_LABEL_PC_KEY,STR_LABEL_PC_SCOPE,STR_LABEL_PC_MISSING,STR_LABEL_PC_INVALID};
@@ -231,7 +237,7 @@ int main() {
     config.model=model;
     config.media_width_mm=30; config.media_length_mm=40;
     before=loading_shown;
-    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
+    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
     before=loading_shown;
     print_result=false; tap(170,268); handleLabelPrintDeferredActions(); balanced(before);
     assert(loading_message==(model==LabelPrinterModel::M220 ? "Sending to M220..." : "Sending to M110..."));
@@ -252,14 +258,14 @@ int main() {
   }
   before=loading_shown;
   content_delta=-1;
-  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
   assert(status_id==STR_LABEL_PRINTER_MEDIA);
   for (auto it=objects.rbegin();it!=objects.rend();++it) {
     auto* o=*it;
     if (o->x==170 && o->y==268) { assert(o->disabled); break; }
   }
   content_delta=0; before=loading_shown;
-  thumbnail_fail=true; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
+  thumbnail_fail=true; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
   assert(status_id==STR_LABEL_PRINTER_NO_PSRAM);
   before_posts=posts;
   assert(!at(15,268)->disabled);
@@ -268,15 +274,19 @@ int main() {
   thumbnail_fail=false;
   for (int code: {FILAMAN_LABEL_NO_PSRAM,500,401,403}) {
     before=loading_shown; fetch_response=code;
-    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
+    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
   }
   fetch_response=200; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   before=loading_shown; response=500; tap(15,268); handleLabelPrintDeferredActions(); balanced(before);
   before=loading_shown; preset_response=500;
   requestLabelPresetSettingsScreen(); handleLabelPrintDeferredActions(); balanced(before);
-  preset=7; fetch_response=200; before=loading_shown;
-  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before,2);
-  assert(preset==7 && last_render_preset==7);
+  selection_response=204; select.user_data=(void*)7; labelPresetRowCb(&select);
+  handleLabelPrintDeferredActions(); assert(preset==7);
+  fetch_response=200; render_resolved=7; before=loading_shown;
+  int before_render_calls=render_calls;
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions(); balanced(before);
+  assert(render_calls==before_render_calls+1);
+  assert(preset==7 && last_render_preset==0);
   before=loading_shown; wifi=false;
   requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   requestLabelPresetSettingsScreen(); handleLabelPrintDeferredActions();
