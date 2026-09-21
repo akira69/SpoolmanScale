@@ -116,11 +116,18 @@ void refreshDeviceSelection() {
 void updateSavedAddress() {
   if (!selected_value || !selected_address || !forget_button) return;
   if (!config.address[0]) {
+    labelPrinterSetReachable(false);
     lv_label_set_text(selected_value, T(STR_PRINTER_NONE));
     lv_label_set_text(selected_address, "");
     lv_obj_set_style_text_color(selected_value, lv_color_hex(UI_COL_INK_SOFT), 0);
     lv_obj_add_flag(forget_button, LV_OBJ_FLAG_HIDDEN);
   } else {
+    if (device_count) {
+      bool found = false;
+      for (size_t i = 0; i < device_count; ++i)
+        if (!strcmp(config.address, devices[i].address)) { found = true; break; }
+      labelPrinterSetReachable(found);
+    }
     lv_label_set_text(selected_value, config.name[0] ? config.name : config.address);
     lv_label_set_text(selected_address, config.name[0] ? config.address : "");
     lv_obj_set_style_text_color(selected_value, lv_color_hex(UI_COL_INK_2), 0);

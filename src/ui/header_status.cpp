@@ -67,10 +67,13 @@ void updateHeaderStatus() {
   lv_obj_set_style_text_color(lbl_hdr_wifi, wifiColor(), 0);
 
   if (lbl_hdr_bt) {
-    if (backendIsFilaMan() && labelPrinterConfigured(labelPrinterLoadConfig()))
+    if (backendIsFilaMan() && labelPrinterConfigured(labelPrinterLoadConfig())) {
       lv_obj_clear_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
-    else
+      lv_obj_set_style_text_color(lbl_hdr_bt,
+          lv_color_hex(labelPrinterReachable() ? 0x28d49a : UI_COL_IDLE), 0);
+    } else {
       lv_obj_add_flag(lbl_hdr_bt, LV_OBJ_FLAG_HIDDEN);
+    }
   }
   if (lbl_btn_more) {
     lv_label_set_text(lbl_btn_more, T(STR_BTN_MORE_INFO));

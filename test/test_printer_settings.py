@@ -121,6 +121,7 @@ lv_obj_t* scr_connection=nullptr;
 LabelPrinterConfig saved={LabelPrinterModel::M220,"Old printer","aa:bb:cc:dd:ee:ff",40,30};
 int scan_calls=0, scan_result=24, loading_shown=0, loading_hidden=0, errors=0;
 bool overlay=false, save_ok=true, in_callback=false, partial_failure=false;
+bool printer_reachable=false;
 int save_calls=0, load_calls=0;
 const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model) {
   static const LabelPrinterProfile m220={LabelPrinterModel::M220,"M220",40,30,20,75,10,150,576,648,false};
@@ -128,6 +129,8 @@ const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model) {
   return model==LabelPrinterModel::M110 ? m110 : m220;
 }
 LabelPrinterConfig labelPrinterLoadConfig() { ++load_calls; return saved; }
+bool labelPrinterReachable() { return printer_reachable; }
+void labelPrinterSetReachable(bool reachable) { printer_reachable=reachable; }
 bool labelPrinterSaveConfig(const LabelPrinterConfig& value) {
   assert(!in_callback); // LVGL callbacks run while prefs writes only report queue acceptance.
   ++save_calls;
@@ -152,6 +155,8 @@ size_t labelPrinterScan(const LabelPrinterConfig& config, LabelPrinterDevice* de
     snprintf(devices[i].address,sizeof(devices[i].address),"11:22:33:44:55:%02x",i);
   }
   if (scan_result) { strcpy(devices[0].name,"Q123456789"); devices[1].name[0]=0; strcpy(devices[2].name,"M220 hint"); }
+  printer_reachable=false;
+  for (int i=0; i<scan_result; ++i) printer_reachable |= !strcmp(config.address,devices[i].address);
   return scan_result;
 }
 bool backendIsFilaMan() { return true; }
@@ -216,11 +221,11 @@ int main() {
   assert(renderedText("Q123456789") && renderedText("Unknown BLE device") && renderedText("Other 23"));
   tapText("M220 hint"); handlePrinterSettingsDeferredActions();
   assert(saved.model==LabelPrinterModel::M110 && !strcmp(saved.address,"11:22:33:44:55:02"));
-  save_ok=false; tapText("Q123456789"); failedSaveKeepsScreen(); assert(errors==1 && !strcmp(saved.address,"11:22:33:44:55:02"));
+  save_ok=false; tapText("Q123456789"); failedSaveKeepsScreen(); assert(errors==1 && printer_reachable && !strcmp(saved.address,"11:22:33:44:55:02"));
   tapText("Clear"); failedSaveKeepsScreen(); assert(errors==2 && saved.address[0]);
-  save_ok=true; tapText("Unknown BLE device"); handlePrinterSettingsDeferredActions(); assert(!saved.name[0] && !strcmp(saved.address,"11:22:33:44:55:01"));
+  save_ok=true; tapText("Unknown BLE device"); handlePrinterSettingsDeferredActions(); assert(printer_reachable && !saved.name[0] && !strcmp(saved.address,"11:22:33:44:55:01"));
   scan_result=0; label_text.clear(); tapScanButton(); handlePrinterSettingsDeferredActions();
-  assert(loading_shown==2 && loading_hidden==2 && renderedText("No Bluetooth devices found"));
+  assert(!printer_reachable && loading_shown==2 && loading_hidden==2 && renderedText("No Bluetooth devices found"));
   tap(button(456,68)); handlePrinterSettingsDeferredActions();
   assert(!renderedText("50 x 25 mm") && renderedText("40 x 60 mm"));
   save_ok=false; tapText("40 x 60 mm"); failedSaveKeepsScreen();

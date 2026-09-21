@@ -87,6 +87,7 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address,
 }
 
 int main() {
+  assert(!labelPrinterReachable());
   clearPrefs();
   LabelPrinterConfig fresh = labelPrinterLoadConfig();
   assert(fresh.model == LabelPrinterModel::M220);
@@ -144,11 +145,13 @@ int main() {
   strcpy(selected.address, "aa:aa:aa:aa:aa:aa");
   char error[128] = "stale";
   assert(labelPrinterPrint(selected, raster, error, sizeof(error), progress));
+  assert(labelPrinterReachable());
   assert(print_calls == 1 && printed_model == LabelPrinterModel::M110);
   assert(printed_address == selected.address && printed_raster == &raster);
   assert(printed_progress == progress && error[0] == '\0');
   print_result = false;
   assert(!labelPrinterPrint(selected, raster, error, sizeof(error)));
+  assert(!labelPrinterReachable());
   assert(print_calls == 2);
   auto rejected = [&](const LabelPrinterConfig& config, const LabelRaster& image) {
     error[0] = '\0';
@@ -188,6 +191,7 @@ int main() {
 
   LabelPrinterDevice scanned[3] = {};
   assert(labelPrinterScan(selected, scanned, 3, progress) == 3);
+  assert(labelPrinterReachable());
   assert(strcmp(scanned[0].address, selected.address) == 0);
   assert(strcmp(scanned[1].name, "speaker") == 0 && !scanned[2].name[0]);
 

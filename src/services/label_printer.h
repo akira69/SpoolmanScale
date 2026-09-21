@@ -40,6 +40,8 @@ const LabelPrinterProfile& labelPrinterProfile(LabelPrinterModel model);
 LabelPrinterConfig labelPrinterLoadConfig();
 bool labelPrinterSaveConfig(const LabelPrinterConfig& config);
 bool labelPrinterConfigured(const LabelPrinterConfig& config);
+bool labelPrinterReachable();
+void labelPrinterSetReachable(bool reachable);
 bool labelPrinterStartupCrash(const char* previous_crumb, bool panic_reset);
 uint16_t labelPrinterDotsForMm(uint16_t mm);
 uint16_t labelPrinterRasterWidth(LabelPrinterModel model, uint16_t media_width_mm);

@@ -15,6 +15,7 @@ static const LabelPrinterProfile kM220 = {
 static const LabelPrinterProfile kM110 = {
   LabelPrinterModel::M110, "M110", 40, 30, 20, 48, 10, 150, 384, 384, true
 };
+bool s_reachable = false;
 
 bool dimensionsValid(const LabelPrinterProfile& profile, uint16_t width, uint16_t length) {
   return profile.model != LabelPrinterModel::NONE &&
@@ -107,6 +108,10 @@ bool labelPrinterConfigured(const LabelPrinterConfig& config) {
   return config.address[0] != '\0';
 }
 
+bool labelPrinterReachable() { return s_reachable; }
+
+void labelPrinterSetReachable(bool reachable) { s_reachable = reachable; }
+
 bool labelPrinterStartupCrash(const char* previous_crumb, bool panic_reset) {
   return panic_reset && previous_crumb &&
          !strcmp(previous_crumb, LABEL_PRINTER_BLE_START_CRUMB);
@@ -116,6 +121,14 @@ size_t labelPrinterScan(const LabelPrinterConfig& selected,
                        LabelPrinterDevice* out, size_t capacity,
                        LabelPrinterProgressFn progress) {
   const size_t count = phomemoMSeriesScan(out, capacity, selected, progress);
+  if (labelPrinterConfigured(selected)) {
+    s_reachable = false;
+    for (size_t i = 0; i < count; ++i)
+      if (!strcmp(out[i].address, selected.address)) {
+        s_reachable = true;
+        break;
+      }
+  }
   labelPrinterSortDevices(out, count, selected);
   return count;
 }
@@ -137,7 +150,9 @@ bool labelPrinterPrint(const LabelPrinterConfig& config, const LabelRaster& imag
     if (error_size) snprintf(error, error_size, "%s", message);
     return false;
   }
-  return phomemoMSeriesPrint(config.model, config.address, image, error, error_size, progress);
+  s_reachable = phomemoMSeriesPrint(config.model, config.address, image,
+                                    error, error_size, progress);
+  return s_reachable;
 }
 
 uint16_t labelPrinterDotsForMm(uint16_t mm) {
