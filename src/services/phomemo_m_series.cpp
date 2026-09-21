@@ -124,7 +124,6 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
                 unsigned(ESP.getFreePsram()));
   crumbSet(LABEL_PRINTER_BLE_START_CRUMB);
   BLEDevice::init("");
-  BLEDevice::setMTU(PHOMEMO_PREFERRED_MTU);
   crumbSet("label printer BLE ready");
   BLEClient* client = BLEDevice::createClient();
   if (!s_disconnect_events) s_disconnect_events = xQueueCreate(1, sizeof(uint8_t));
@@ -140,6 +139,7 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
   bool ok = false;
   bool connected = false;
   bool connect_completed = true;
+  bool mtu_requested = false;
   do {
     if (!client->connect(BLEAddress(address))) {
       // REG/OPEN give their semaphores before BLEDevice calls our hook.
@@ -154,6 +154,8 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
     connected = true;
     s_gatt_if = client->getGattcIf();
     s_conn_id = client->getConnId();
+    mtu_requested = client->setMTU(PHOMEMO_PREFERRED_MTU);
+    if (mtu_requested) delay(200);
     BLERemoteService* service = client->getService(BLEUUID((uint16_t)0xff00));
     BLERemoteCharacteristic* write = service ? service->getCharacteristic(BLEUUID((uint16_t)0xff02)) : nullptr;
     if (!write || (!write->canWrite() && !write->canWriteNoResponse())) {
@@ -164,8 +166,8 @@ bool phomemoMSeriesPrint(LabelPrinterModel model, const char* address, const Lab
     s_write_handle = write->getHandle();
     const size_t chunk = phomemoWriteChunk(client->getMTU());
     const bool response = !write->canWriteNoResponse();
-    Serial.printf("%s BLE connected: MTU=%u chunk=%u response=%u raster=%ux%u (%u bytes) heap=%u largest=%u psram=%u\n", profile.name,
-                  client->getMTU(), unsigned(chunk), unsigned(response),
+    Serial.printf("%s BLE connected: MTU=%u requested=%u chunk=%u response=%u raster=%ux%u (%u bytes) heap=%u largest=%u psram=%u\n", profile.name,
+                  client->getMTU(), unsigned(mtu_requested), unsigned(chunk), unsigned(response),
                   unsigned(image.width), unsigned(image.height), unsigned(image.length),
                   unsigned(ESP.getFreeHeap()),
                   unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
