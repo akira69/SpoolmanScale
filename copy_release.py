@@ -37,6 +37,10 @@ def copy_release_files(source, target, env):
     for d in [webflasher_dir, ota_github_dir, ota_browser_dir, source_dir]:
         os.makedirs(d, exist_ok=True)
 
+    licenses_dir = os.path.join(project_dir, "licenses")
+    if os.path.isdir(licenses_dir):
+        shutil.copytree(licenses_dir, os.path.join(release_base, "licenses"), dirs_exist_ok=True)
+
     # Webflasher - alle drei Binaries
     for src_name, dst_name in [
         ("bootloader.bin", "bootloader.bin"),

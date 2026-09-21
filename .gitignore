@@ -16,6 +16,8 @@
 !scripts/**
 !images/
 !images/**
+!licenses/
+!licenses/**
 !tools/
 !tools/**
 # Python caches the tools leave behind.

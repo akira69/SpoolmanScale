@@ -152,6 +152,8 @@ Then, back in **Settings**, tap **Print label**. The spool list loads the 10 new
 
 **Printer protocol reference:** The ESP32 Phomemo M-series transport was informed by the MIT-licensed [DeepCoreSystem/myphomemo](https://github.com/DeepCoreSystem/myphomemo) project, especially its BLE transport and M-series ESC/POS raster implementation. SpoolmanScale reimplements the required protocol in C++ for the ESP32; the M220 path is hardware verified, while M110 support remains experimental.
 
+**BLE library:** Printing uses [NimBLE-Arduino 2.4.0](https://github.com/h2zero/NimBLE-Arduino), licensed under Apache 2.0. Its [license](licenses/NimBLE-Arduino/LICENSE) and [notice](licenses/NimBLE-Arduino/NOTICE) are included with source and firmware releases.
+
 > An API key inherits the permissions of the user who created it. If you would rather not hand the scale an admin key, create a separate user with a limited role. The exact list of permissions SpoolmanScale needs is behind the ℹ️ button on that page.
 
 FilaMan reaches furthest into the tag features. It can send the scale a write job together with the tag contents, which you confirm on the device, and it can ask the scale to read a tag and take the data into its inventory. Lift a freshly weighed spool off the pad and the scale offers to hand it to FilaMan for the next printer that loads a tray, so you do not have to assign it by hand.
