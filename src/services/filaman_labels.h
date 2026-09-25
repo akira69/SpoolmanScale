@@ -5,8 +5,9 @@
 // Local fetch error when the scale cannot allocate the raster in PSRAM.
 constexpr int FILAMAN_LABEL_NO_PSRAM = -3;
 
+// Allow the server's 30-second render deadline plus transfer overhead.
 int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_id,
                           int preset_id, uint16_t requested_width, const char* orientation,
                           LabelRaster* out, int* resolved_preset_id = nullptr,
-                          uint32_t timeout_ms = 12000);
+                          uint32_t timeout_ms = 35000);
 void filamanFreeLabel(LabelRaster* image);

@@ -62,13 +62,28 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
                "&width=" + requested_width;
   if (preset_id) url += String("&preset_id=") + preset_id;
   HTTPClient http;
-  if (!http.begin(url)) return -1;
-  http.setTimeout(timeout_ms);
-  http.setReuse(false);
-  const char* headers[] = {"X-Preset-Id", "X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated"};
-  http.collectHeaders(headers, 7);
-  addApiKey(http, api_key);
-  const int code = http.GET();
+  const char* headers[] = {"X-Preset-Id", "X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated", "Retry-After"};
+  int code;
+  // ponytail: two retries cover a busy renderer; no general HTTP retry policy.
+  for (unsigned attempt = 0; ; ++attempt) {
+    if (!http.begin(url)) return -1;
+    http.setTimeout(timeout_ms);
+    http.setReuse(false);
+    http.collectHeaders(headers, 8);
+    addApiKey(http, api_key);
+    code = http.GET();
+    if (code != 503 || attempt == 2) break;
+    uint16_t retry_seconds;
+    // Missing runtime files also return 503, without Retry-After. Do not retry
+    // those, malformed/date headers, or delays too long for this screen.
+    if (!parseHeaderNumber(http.header("Retry-After"), &retry_seconds) || retry_seconds > 5) break;
+    http.end();
+    const uint32_t started = millis();
+    while (millis() - started < uint32_t(retry_seconds) * 1000) {
+      if (httpProgressActive()) httpProgressHook()(0);
+      delay(10);
+    }
+  }
   if (code != 200) { http.end(); return code; }
 
   LabelRaster image{};

@@ -100,6 +100,8 @@ with tempfile.TemporaryDirectory() as d:
 #include <string>
 #include <cstring>
 #include <stdint.h>
+uint32_t millis();
+void delay(uint32_t);
 class String : public std::string {
 public:
   using std::string::string;
@@ -121,10 +123,16 @@ virtual int available()=0; };
 #include <Stream.h>
 #include <algorithm>
 #include <map>
+#include <vector>
+#include <set>
+#include <assert.h>
 extern std::map<std::string,std::string> headers;
 extern std::string seen_url;
 extern size_t bytes_left;
-extern int declared;
+extern int declared, get_calls;
+extern std::vector<int> responses;
+extern uint32_t clock_ms, required_response_ms;
+extern bool connection_open;
 class WiFiClient : public Stream {
 public: using Stream::readBytes;
 size_t readBytes(char* p,size_t n) override { n=std::min(n,bytes_left); memset(p,0,n); bytes_left-=n; return n; }
@@ -132,19 +140,25 @@ int available() override { return bytes_left; }
 };
 class HTTPClient {
 public:
- bool begin(const String& url) { seen_url=url; return true; }
- void setTimeout(uint32_t) {} void setReuse(bool) {}
- void collectHeaders(const char**,int) {} void addHeader(const char*,const String&) {}
- int GET() { return 200; } String header(const char* key) { return String(headers[key]); }
+ uint32_t timeout=0;
+ std::set<std::string> collected;
+ bool begin(const String& url) { assert(!connection_open); connection_open=true; seen_url=url; collected.clear(); return true; }
+ void setTimeout(uint32_t value) { timeout=value; } void setReuse(bool) {}
+ void collectHeaders(const char** keys,int count) { collected.insert(keys,keys+count); }
+ void addHeader(const char*,const String&) {}
+ int GET() { const size_t index=get_calls++; return timeout < required_response_ms ? -11 : responses[std::min(index,responses.size()-1)]; }
+ String header(const char* key) { return String(collected.count(key) ? headers[key] : ""); }
  int getSize() { return declared; } WiFiClient* getStreamPtr() { static WiFiClient raw; return &raw; }
- void end() {}
+ void end() { connection_open=false; }
 };
 ''')
     header('esp_heap_caps.h', '#include <stdlib.h>\n#define MALLOC_CAP_SPIRAM 0\ninline void* heap_caps_malloc(size_t n,int) { return malloc(n); }\n')
     header('services/http_progress.h', r'''
 #include <Stream.h>
 extern bool progress_active;
-extern int progress_reads;
+extern int progress_reads, retry_progress;
+inline void retryProgress(size_t) { ++retry_progress; }
+inline void (*httpProgressHook())(size_t) { return retryProgress; }
 struct HttpStallTime {};
 inline bool httpProgressActive() { return progress_active; }
 class HttpProgressStream : public Stream {
@@ -161,8 +175,12 @@ public: explicit HttpProgressStream(Stream& s) : raw(s) {}
 std::map<std::string,std::string> headers;
 std::string seen_url;
 size_t bytes_left=0;
-int declared=0, progress_reads=0;
-bool progress_active=false;
+int declared=0, progress_reads=0, retry_progress=0, get_calls=0;
+std::vector<int> responses{200};
+uint32_t clock_ms=0, required_response_ms=0;
+bool progress_active=false, connection_open=false;
+uint32_t millis() { return clock_ms; }
+void delay(uint32_t ms) { assert(!connection_open); clock_ms+=ms; }
 int main() {
   headers={{"X-Preset-Id","42"},{"X-Image-Width","384"},{"X-Image-Height","240"},{"X-Row-Bytes","48"},
            {"X-Content-Width","320"},{"X-Rotated","0"},{"X-Bit-Order","msb-black-1"}};
@@ -182,6 +200,38 @@ int main() {
       assert(!image.pixels);
     }
   }
+  // A busy renderer succeeds on retry, using a new connection and repainting the overlay.
+  progress_active=true; retry_progress=0; get_calls=0; clock_ms=0;
+  headers["Retry-After"]="1"; responses={503,200}; bytes_left=declared;
+  int selected=-1;
+  assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==200);
+  assert(get_calls==2 && clock_ms==1000 && retry_progress>0 && selected==42);
+  assert(!connection_open && image.pixels);
+  filamanFreeLabel(&image);
+  // Busy forever stops after two retries, without leaving a printable raster.
+  get_calls=0; clock_ms=0; responses={503}; headers["Retry-After"]="2";
+  assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==503);
+  assert(get_calls==3 && clock_ms==4000 && !image.pixels && selected==-1 && !connection_open);
+  // Missing, malformed, or excessive server delays must not stall the scale or retry early.
+  for (const char* value: {"", "bad", "-1", "1junk", "6", "999999999999999", "Wed, 21 Oct 2015 07:28:00 GMT"}) {
+    headers["Retry-After"]=value; get_calls=0; clock_ms=0;
+    assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==503);
+    assert(get_calls==1 && clock_ms==0 && !image.pixels && !connection_open);
+  }
+  headers["Retry-After"]="1";
+  for (int code: {401,403,404,422,500,-11}) {
+    responses={code}; get_calls=0; clock_ms=0;
+    assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==code);
+    assert(get_calls==1 && clock_ms==0 && !image.pixels && !connection_open);
+  }
+  // A response just beyond the server's 30-second render ceiling still fits our timeout.
+  responses={200}; get_calls=0; bytes_left=declared; required_response_ms=31000;
+  assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==200);
+  filamanFreeLabel(&image);
+  // An explicit caller timeout remains respected.
+  get_calls=0;
+  assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected,12000)==-11);
+  required_response_ms=0;
   headers.erase("X-Preset-Id"); bytes_left=declared;
   int resolved=99;
   assert(filamanFetchMonoLabel("http://fila","key",123,0,384,"landscape",&image,&resolved)==-2);
