@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as tmp:
     header('services/http_progress.h', '#include <stddef.h>\nextern bool progress_active; struct HttpStallTime {}; struct HttpStall { explicit HttpStall(void (*)(size_t)) { progress_active=true; } ~HttpStall() { progress_active=false; } };\n')
     header('ui/loading_overlay.h', 'void loadingOverlayShow(const char*); void loadingOverlayHide(); void loadingOverlayTick(); void loadingOverlayProgress(size_t);\n')
     header('app/app_state.h', 'extern bool sm_found; extern int sm_id; extern char cfg_wifi_ssid[33]; extern char cfg_wifi_password[65];\n')
-    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_W_SESSION_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED, STR_LABEL_PREVIEW, STR_LABEL_CHANGE_PRESET, STR_LABEL_PRINTER_PRINT, STR_LABEL_PRINTER_SELECT, STR_LABEL_PRINTER_MEDIA, STR_LABEL_PRINTER_FETCH, STR_LABEL_PRINTER_SEND, STR_LABEL_PRINTER_SENT, STR_LABEL_PRINTER_FAILED, STR_LABEL_PRINTER_NO_PSRAM };\nextern int status_id; inline const char* T(int id) { status_id=id; return id==STR_LABEL_PRINTER_SEND ? "Sending to %s..." : "text"; }\n''')
+    header('lang.h', '''enum { STR_LABEL_DEFAULT, STR_NO_WIFI, STR_LABEL_LOADING, STR_LABEL_LOAD_FAIL, STR_LABEL_PRESET_REMOVED, STR_LABEL_NONE, STR_LABEL_PRESET_TITLE, STR_W_SESSION_REFRESH, STR_LABEL_PC_PENDING, STR_LABEL_PC_OPEN, STR_LABEL_PC_QUEUED, STR_LABEL_PC_KEY, STR_LABEL_PC_SCOPE, STR_LABEL_PC_MISSING, STR_LABEL_PC_INVALID, STR_LABEL_PC_FAILED, STR_LABEL_PREVIEW, STR_LABEL_CHANGE_PRESET, STR_LABEL_PRINTER_PRINT, STR_LABEL_PRINTER_SELECT, STR_LABEL_PRINTER_MEDIA, STR_LABEL_PRINTER_FETCH, STR_LABEL_PRINTER_SEND, STR_LABEL_PRINTER_SENT, STR_LABEL_PRINTER_FAILED, STR_LABEL_PRINTER_NO_PSRAM, STR_LABEL_PRESET_REQUIRES_CHROMIUM };\nextern int status_id; inline const char* T(int id) { status_id=id; return id==STR_LABEL_PRINTER_SEND ? "Sending to %s..." : "text"; }\n''')
     header('services/backend.h', 'bool backendIsFilaMan(); const char* backendBaseUrl(); const char* filamanApiKey();\n')
     header('services/prefs_store.h', '#include <Arduino.h>\nint prefsGetInt(const char*,int); bool prefsPutInt(const char*,int); String prefsGetString(const char*); bool prefsPutString(const char*,const char*);\n')
     header('services/wifi_manager.h', 'bool wifiManagerIsConnected(); void wifiManagerBegin(const char*, const char*);\n')
@@ -225,9 +225,18 @@ int main() {
     assert(status_id==statuses[i]);
     assert(preset_fetches==before);
   }
-  fetch_response=-3; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
+  fetch_response=FILAMAN_LABEL_NO_PSRAM; requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
   assert(status_id==STR_LABEL_PRINTER_NO_PSRAM);
   assert(loading_shown==loading_hidden && loading_depth==0);
+  fetch_response=FILAMAN_LABEL_PRESET_REQUIRES_CHROMIUM;
+  requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
+  assert(status_id==STR_LABEL_PRESET_REQUIRES_CHROMIUM);
+  assert(at(170,268)->disabled);
+  for (int transport_error: {-3,-4}) {
+    fetch_response=transport_error;
+    requestLabelPreviewScreen(123); handleLabelPrintDeferredActions();
+    assert(status_id==STR_LABEL_PRINTER_FAILED);
+  }
   int before_posts=posts;
   assert(!at(15,268)->disabled);
   tap(15,268); handleLabelPrintDeferredActions();

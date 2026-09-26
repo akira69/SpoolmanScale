@@ -305,6 +305,9 @@ void fetchPreview() {
       case 401: setStatus(T(STR_LABEL_PC_KEY)); break;
       case 403: setStatus(T(STR_LABEL_PC_SCOPE)); break;
       case FILAMAN_LABEL_NO_PSRAM: setStatus(T(STR_LABEL_PRINTER_NO_PSRAM)); break;
+      case FILAMAN_LABEL_PRESET_REQUIRES_CHROMIUM:
+        setStatus(T(STR_LABEL_PRESET_REQUIRES_CHROMIUM));
+        break;
       default: setHttpError(T(STR_LABEL_PRINTER_FAILED), code); break;
     }
     return;

@@ -182,6 +182,8 @@ bool progress_active=false, connection_open=false;
 uint32_t millis() { return clock_ms; }
 void delay(uint32_t ms) { assert(!connection_open); clock_ms+=ms; }
 int main() {
+  static_assert(FILAMAN_LABEL_NO_PSRAM < -100, "local errors must not collide with HTTPClient");
+  static_assert(FILAMAN_LABEL_PRESET_REQUIRES_CHROMIUM < -100, "local errors must not collide with HTTPClient");
   headers={{"X-Preset-Id","42"},{"X-Image-Width","384"},{"X-Image-Height","240"},{"X-Row-Bytes","48"},
            {"X-Content-Width","320"},{"X-Rotated","0"},{"X-Bit-Order","msb-black-1"}};
   declared=48*240;
@@ -219,6 +221,13 @@ int main() {
     assert(get_calls==1 && clock_ms==0 && !image.pixels && !connection_open);
   }
   headers["Retry-After"]="1";
+  responses={422}; get_calls=0;
+  headers["X-Label-Error"]="preset_requires_chromium";
+  assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==FILAMAN_LABEL_PRESET_REQUIRES_CHROMIUM);
+  assert(get_calls==1 && !image.pixels && selected==-1 && !connection_open);
+  headers["X-Label-Error"]="unknown";
+  assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==422);
+  headers.erase("X-Label-Error");
   for (int code: {401,403,404,422,500,-11}) {
     responses={code}; get_calls=0; clock_ms=0;
     assert(filamanFetchMonoLabel("http://fila","key",123,7,384,"landscape",&image,&selected)==code);

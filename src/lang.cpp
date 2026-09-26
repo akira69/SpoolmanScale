@@ -884,6 +884,8 @@ const char* const STRINGS[][3] = {
     "Impossible de charger l'étiquette" },  // STR_LABEL_PRINTER_FAILED
   { "Kein PSRAM für Label. Waagen-Hardware und Konfiguration prüfen.", "No PSRAM for label. Check scale hardware and configuration.",
     "Pas de PSRAM pour l'étiquette. Vérifiez le matériel et la configuration." },  // STR_LABEL_PRINTER_NO_PSRAM
+  { "Diese Vorlage erfordert Chromium auf FilaMan.", "This preset requires Chromium on FilaMan.",
+    "Ce modèle nécessite Chromium sur FilaMan." },  // STR_LABEL_PRESET_REQUIRES_CHROMIUM
   { "Drucker nicht erreichbar. Drucker prüfen und erneut auf Drucken tippen.", "Printer unavailable. Check it and tap Print to try again.",
     "Imprimante indisponible. Vérifiez-la et touchez Imprimer pour réessayer." },  // STR_LABEL_PRINTER_CONNECT_RETRY
   { "Bluetooth-Druckerproblem", "Bluetooth printer problem",

@@ -62,14 +62,14 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
                "&width=" + requested_width;
   if (preset_id) url += String("&preset_id=") + preset_id;
   HTTPClient http;
-  const char* headers[] = {"X-Preset-Id", "X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated", "Retry-After"};
+  const char* headers[] = {"X-Preset-Id", "X-Image-Width", "X-Image-Height", "X-Row-Bytes", "X-Bit-Order", "X-Content-Width", "X-Rotated", "Retry-After", "X-Label-Error"};
   int code;
   // ponytail: two retries cover a busy renderer; no general HTTP retry policy.
   for (unsigned attempt = 0; ; ++attempt) {
     if (!http.begin(url)) return -1;
     http.setTimeout(timeout_ms);
     http.setReuse(false);
-    http.collectHeaders(headers, 8);
+    http.collectHeaders(headers, 9);
     addApiKey(http, api_key);
     code = http.GET();
     if (code != 503 || attempt == 2) break;
@@ -84,7 +84,12 @@ int filamanFetchMonoLabel(const char* base_url, const char* api_key, int spool_i
       delay(10);
     }
   }
-  if (code != 200) { http.end(); return code; }
+  if (code != 200) {
+    const bool requires_chromium = code == 422 &&
+        http.header("X-Label-Error") == "preset_requires_chromium";
+    http.end();
+    return requires_chromium ? FILAMAN_LABEL_PRESET_REQUIRES_CHROMIUM : code;
+  }
 
   LabelRaster image{};
   int header_preset_id = 0;
