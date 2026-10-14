@@ -12,8 +12,7 @@
 
 #define LS_KEY_PRESET         "lbl_fm_preset"
 #define LS_LIST_TIMEOUT_MS    8000
-// The basic renderer answers in a tenth of a second; a busy or distant
-// server gets room before the print gives up on it.
+// Allow time for the server's configured renderer and network latency.
 #define LS_RENDER_TIMEOUT_MS  15000
 // The list is asked again after this long, so a preset laid out in FilaMan
 // meanwhile shows up; one that did not answer is asked again sooner.

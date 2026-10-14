@@ -154,7 +154,7 @@ int filamanLabelRender(const FilamanLabelRequest& req, LabelRaster* out,
   char path[FM_LABEL_PATH_LEN];
   snprintf(path, sizeof(path),
            "/api/v1/labels/spool/%d/render?format=mono1&dpi=%u&width=%u&align=left"
-           "&preset_id=%d&renderer=basic",
+           "&preset_id=%d",
            req.spool_id, (unsigned)req.dpi, (unsigned)req.row_width, req.preset_id);
   BackendHttp http;
   if (!http.begin(String(req.base_url) + path)) return -1;

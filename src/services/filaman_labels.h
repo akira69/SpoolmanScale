@@ -16,8 +16,8 @@
 //
 //  A server without that API answers the preset list with 404, so
 //  the list doubles as the probe: no list, no choice offered.
-//  Only the "basic" renderer is asked for. It is the one that
-//  printed best on thermal paper in every test round.
+//  FilaMan chooses its configured renderer; the scale only requires
+//  the mono1 raster contract, not a particular rendering engine.
 // ============================================================
 
 #define FM_LABEL_NAME_LEN    40
